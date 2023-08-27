@@ -6,10 +6,17 @@ from sklearn.datasets import load_diabetes
 diabetes = load_diabetes()
 X = diabetes.data
 y = diabetes.target.reshape(-1, 1)
+# print(type(X),type(y))
+# print(X.shape,y.shape,diabetes.target.shape)
+# print(X[:10],y[:10],diabetes.target)
 
 # Add a bias term (intercept)
 X_b = np.c_[np.ones((X.shape[0], 1)), X]
+# print(X_b[0])
 
+
+
+#
 # Linear Regression with Gradient Descent
 def compute_cost(theta, X, y):
     m = len(y)
@@ -26,6 +33,7 @@ def r_squared(y, y_pred):
     r2 = 1 - (rss / tss)
     return r2
 
+
 def gradient_descent(X, y, theta, learning_rate, num_iterations):
     m = len(y)
     cost_history = []
@@ -37,16 +45,19 @@ def gradient_descent(X, y, theta, learning_rate, num_iterations):
         cost_history.append(cost)
 
     return theta, cost_history
-
+#
 # Initial values
 theta = np.random.randn(X_b.shape[1], 1)  # Random initialization
 learning_rate = 0.1
-num_iterations = 1000
+num_iterations = 20000
+
+
+
 
 # Perform gradient descent to find optimal parameters
 optimal_theta, cost_history = gradient_descent(X_b, y, theta, learning_rate, num_iterations)
-
-# Print the optimal parameters (intercept and coefficients)
+print(optimal_theta,cost_history[0],cost_history[-1])
+# # Print the optimal parameters (intercept and coefficients)
 print("Optimal Parameters:")
 print("Intercept (theta_0):", optimal_theta[0])
 print("Coefficients (theta_1 to theta_10):", optimal_theta[1:])
