@@ -16,6 +16,7 @@ X_b = np.c_[np.ones((X.shape[0], 1)), X]
 
 
 
+
 #
 # Linear Regression with Gradient Descent
 def compute_cost(theta, X, y):
