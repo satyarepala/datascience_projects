@@ -43,3 +43,27 @@ plt.title('t-SNE')
 
 plt.show()
 
+
+
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+# Example data
+list1 = np.random.rand(500, 200)  # 500 sublists, each of length 200
+list2 = np.random.rand(2500, 200)  # 2500 sublists, each of length 200
+data = np.concatenate((list1, list2), axis=0)
+colors = ['red'] * len(list1) + ['blue'] * len(list2)
+
+# Apply PCA to reduce to 3 dimensions
+pca = PCA(n_components=3)
+data_reduced_pca = pca.fit_transform(data)
+
+# Plot in 3D
+fig = plt.figure(figsize=(10, 8))
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(data_reduced_pca[:, 0], data_reduced_pca[:, 1], data_reduced_pca[:, 2], c=colors, alpha=0.6)
+ax.set_title('PCA 3D Visualization')
+plt.show()
+
+
