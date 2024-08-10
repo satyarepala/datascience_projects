@@ -45,6 +45,32 @@ print("\nCluster Counts (Clusters x Classes):")
 for cluster, counts in cluster_counts.items():
     print(f"Cluster {cluster}: Class 0 count = {counts[0]}, Class 1 count = {counts[1]}")
 
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Generate sample data
+X, y = make_classification(n_samples=1000, n_features=20, 
+                           n_classes=2, n_clusters_per_class=1, 
+                           weights=[0.1, 0.9], flip_y=0, 
+                           random_state=42)
+
+# Initialize Random Forest Classifier with class weights
+clf = RandomForestClassifier(class_weight='balanced', random_state=42)
+
+# Fit the model
+clf.fit(X, y)
+
+# Predict on the same data
+y_pred = clf.predict(X)
+
+# Evaluate
+print("Confusion Matrix:")
+print(confusion_matrix(y, y_pred))
+print("\nClassification Report:")
+print(classification_report(y, y_pred))
+
 # Note: Noise points (label -1) are not included in the counts
 noise_points = np.sum(dbscan_labels == -1)
 print(f"\nNumber of noise points: {noise_points}")
