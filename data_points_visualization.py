@@ -1,8 +1,7 @@
 import numpy as np
-from sklearn.cluster import KMeans
-from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix
 
 # Step 1: Generate Imbalanced Sample Data
 np.random.seed(42)
@@ -19,43 +18,33 @@ labels_class2 = np.zeros(10000)  # Label 0 for Class 2
 X = np.vstack((class1, class2))
 y = np.hstack((labels_class1, labels_class2))
 
-# Step 2: Apply k-Means Clustering
-kmeans = KMeans(n_clusters=2, random_state=42)
-kmeans.fit(X)
-cluster_labels = kmeans.labels_
+# Standardize the data (important for DBSCAN)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Step 2: Apply DBSCAN Clustering
+dbscan = DBSCAN(eps=0.5, min_samples=5)  # eps and min_samples can be tuned
+dbscan_labels = dbscan.fit_predict(X_scaled)
+
+# Number of clusters found (excluding noise)
+num_clusters = len(set(dbscan_labels)) - (1 if -1 in dbscan_labels else 0)
+print(f"Number of clusters found: {num_clusters}")
 
 # Step 3: Validate Clusters
 # Count the number of points from each class in each cluster
-cluster_counts = np.zeros((2, 2))  # Shape: (number of clusters, number of classes)
+unique_clusters = set(dbscan_labels)
+cluster_counts = {cluster: np.zeros(2) for cluster in unique_clusters}
 
 for i in range(len(y)):
-    cluster = cluster_labels[i]
+    cluster = dbscan_labels[i]
     true_class = int(y[i])
-    cluster_counts[cluster, true_class] += 1
+    if cluster != -1:  # Exclude noise points
+        cluster_counts[cluster][true_class] += 1
 
-print("Cluster Counts (Clusters x Classes):")
-print(cluster_counts)
+print("\nCluster Counts (Clusters x Classes):")
+for cluster, counts in cluster_counts.items():
+    print(f"Cluster {cluster}: Class 0 count = {counts[0]}, Class 1 count = {counts[1]}")
 
-# Step 4: Optional - 3D Visualization of Clusters
-# Reduce dimensionality to 3D for visualization
-from sklearn.decomposition import PCA
-
-pca = PCA(n_components=3)
-X_reduced = pca.fit_transform(X)
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-
-# Plotting clusters
-scatter = ax.scatter(X_reduced[:, 0], X_reduced[:, 1], X_reduced[:, 2], c=cluster_labels, cmap='viridis', marker='o')
-
-# Plotting class labels
-for label in np.unique(y):
-    ax.scatter(X_reduced[y == label, 0], X_reduced[y == label, 1], X_reduced[y == label, 2], label=f'Class {int(label)}')
-
-ax.set_xlabel('PC 1')
-ax.set_ylabel('PC 2')
-ax.set_zlabel('PC 3')
-plt.title('k-Means Clustering (k=2)')
-plt.legend()
-plt.show()
+# Note: Noise points (label -1) are not included in the counts
+noise_points = np.sum(dbscan_labels == -1)
+print(f"\nNumber of noise points: {noise_points}")
