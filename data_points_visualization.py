@@ -67,3 +67,59 @@ ax.set_title('PCA 3D Visualization')
 plt.show()
 
 
+
+
+
+
+
+
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score
+
+# Step 1: Generate Sample Data
+np.random.seed(42)
+
+# Class 1 and Class 2 data (500 points each, 200 features)
+class1 = np.random.rand(500, 200) + np.array([0.5] * 200)
+class2 = np.random.rand(500, 200) + np.array([-0.5] * 200)
+
+# Labels
+labels_class1 = np.zeros(500)  # Label 0 for Class 1
+labels_class2 = np.ones(500)   # Label 1 for Class 2
+
+# Combine data and labels
+X = np.vstack((class1, class2))
+y = np.hstack((labels_class1, labels_class2))
+
+# Step 2: Split the Data (80% training, 20% testing) with stratification
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# Step 3: Train SVM Model with RBF Kernel
+svm_model = SVC(kernel='rbf', C=1.0, gamma='scale')  # C and gamma are hyperparameters to tune
+svm_model.fit(X_train, y_train)
+
+# Step 4: Predict on Test Data
+y_pred = svm_model.predict(X_test)
+
+# Step 5: Evaluate the Model
+# Confusion Matrix
+conf_matrix = confusion_matrix(y_test, y_pred)
+print("Confusion Matrix:")
+print(conf_matrix)
+
+# Classification Report (includes precision, recall, F1-score)
+class_report = classification_report(y_test, y_pred, target_names=['Class 1', 'Class 2'])
+print("\nClassification Report:")
+print(class_report)
+
+# Precision and Recall Scores
+precision = precision_score(y_test, y_pred)
+recall = recall_score(y_test, y_pred)
+
+print(f"\nPrecision: {precision:.2f}")
+print(f"Recall: {recall:.2f}")
+
+
+
