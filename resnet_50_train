@@ -1,0 +1,116 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset, random_split
+from torchvision import models
+import numpy as np
+from sklearn.metrics import precision_score, recall_score, accuracy_score
+from sklearn.utils.class_weight import compute_class_weight
+
+
+class CustomDataset(Dataset):
+    def __init__(self, data, labels):
+        self.data = data
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+# Example data
+data = np.random.rand(100000, 1, 7, 100).astype(np.float32)
+labels = np.random.randint(0, 2, size=(100000,)).astype(np.float32)
+
+# Create the dataset
+dataset = CustomDataset(data, labels)
+
+# Split into train and validation sets (e.g., 80% train, 20% validation)
+train_size = int(0.8 * len(dataset))
+val_size = len(dataset) - train_size
+train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+# Create DataLoaders
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+
+
+# Compute class weights
+class_weights = compute_class_weight('balanced', classes=np.unique(labels), y=labels)
+class_weights = torch.tensor(class_weights, dtype=torch.float32)
+
+# Define the loss function with class weights
+criterion = nn.CrossEntropyLoss(weight=class_weights)
+
+
+# Load the ResNet-50 model
+model = models.resnet50(pretrained=True)
+
+# Modify the first convolutional layer to accept (1, 7, 100) input
+model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+
+# Modify the fully connected layer for binary classification
+model.fc = nn.Linear(model.fc.in_features, 2)
+
+# Move model to GPU if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
+
+# Define the optimizer
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Training loop
+num_epochs = 10
+
+for epoch in range(num_epochs):
+    model.train()
+    running_loss = 0.0
+    all_labels = []
+    all_preds = []
+    
+    for inputs, labels in train_loader:
+        inputs, labels = inputs.to(device), labels.to(device).long()
+
+        optimizer.zero_grad()
+        
+        # Forward pass
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+        
+        # Backward pass and optimization
+        loss.backward()
+        optimizer.step()
+        
+        running_loss += loss.item()
+        _, preds = torch.max(outputs, 1)
+        all_labels.extend(labels.cpu().numpy())
+        all_preds.extend(preds.cpu().numpy())
+    
+    # Calculate metrics for the epoch
+    train_loss = running_loss / len(train_loader)
+    train_accuracy = accuracy_score(all_labels, all_preds)
+    train_precision = precision_score(all_labels, all_preds)
+    train_recall = recall_score(all_labels, all_preds)
+    
+    print(f"Epoch {epoch+1}/{num_epochs}, Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.4f}, Precision: {train_precision:.4f}, Recall: {train_recall:.4f}")
+    
+    # Validation phase
+    model.eval()
+    val_labels = []
+    val_preds = []
+    
+    with torch.no_grad():
+        for inputs, labels in val_loader:
+            inputs, labels = inputs.to(device), labels.to(device).long()
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            val_labels.extend(labels.cpu().numpy())
+            val_preds.extend(preds.cpu().numpy())
+    
+    val_accuracy = accuracy_score(val_labels, val_preds)
+    val_precision = precision_score(val_labels, val_preds)
+    val_recall = recall_score(val_labels, val_preds)
+    
+    print(f"Validation Accuracy: {val_accuracy:.4f}, Precision: {val_precision:.4f}, Recall: {val_recall:.4f}")
