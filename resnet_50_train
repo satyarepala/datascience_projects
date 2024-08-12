@@ -61,6 +61,11 @@ model.to(device)
 # Define the optimizer
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+# Early stopping parameters
+patience = 3
+best_val_auc = 0
+early_stop_counter = 0
+
 # Training loop
 num_epochs = 10
 
@@ -69,6 +74,7 @@ for epoch in range(num_epochs):
     running_loss = 0.0
     all_labels = []
     all_preds = []
+    all_probs = []
     
     for inputs, labels in train_loader:
         inputs, labels = inputs.to(device), labels.to(device).long()
@@ -85,8 +91,11 @@ for epoch in range(num_epochs):
         
         running_loss += loss.item()
         _, preds = torch.max(outputs, 1)
+        probs = torch.softmax(outputs, dim=1)[:, 1]  # Probability for class 1
+        
         all_labels.extend(labels.cpu().numpy())
         all_preds.extend(preds.cpu().numpy())
+        all_probs.extend(probs.cpu().numpy())
     
     # Calculate metrics for the epoch
     train_loss = running_loss / len(train_loader)
@@ -94,23 +103,46 @@ for epoch in range(num_epochs):
     train_precision = precision_score(all_labels, all_preds)
     train_recall = recall_score(all_labels, all_preds)
     
-    print(f"Epoch {epoch+1}/{num_epochs}, Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.4f}, Precision: {train_precision:.4f}, Recall: {train_recall:.4f}")
+    precision, recall, _ = precision_recall_curve(all_labels, all_probs)
+    train_prc_auc = auc(recall, precision)
+    
+    print(f"Epoch {epoch+1}/{num_epochs}, Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.4f}, Precision: {train_precision:.4f}, Recall: {train_recall:.4f}, PRC AUC: {train_prc_auc:.4f}")
     
     # Validation phase
     model.eval()
     val_labels = []
     val_preds = []
+    val_probs = []
     
     with torch.no_grad():
         for inputs, labels in val_loader:
             inputs, labels = inputs.to(device), labels.to(device).long()
             outputs = model(inputs)
             _, preds = torch.max(outputs, 1)
+            probs = torch.softmax(outputs, dim=1)[:, 1]  # Probability for class 1
+            
             val_labels.extend(labels.cpu().numpy())
             val_preds.extend(preds.cpu().numpy())
+            val_probs.extend(probs.cpu().numpy())
     
     val_accuracy = accuracy_score(val_labels, val_preds)
     val_precision = precision_score(val_labels, val_preds)
     val_recall = recall_score(val_labels, val_preds)
     
-    print(f"Validation Accuracy: {val_accuracy:.4f}, Precision: {val_precision:.4f}, Recall: {val_recall:.4f}")
+    precision, recall, _ = precision_recall_curve(val_labels, val_probs)
+    val_prc_auc = auc(recall, precision)
+    
+    print(f"Validation Accuracy: {val_accuracy:.4f}, Precision: {val_precision:.4f}, Recall: {val_recall:.4f}, PRC AUC: {val_prc_auc:.4f}")
+    
+    # Early stopping based on validation PRC AUC
+    if val_prc_auc > best_val_auc:
+        best_val_auc = val_prc_auc
+        early_stop_counter = 0
+        # Save the model if validation PRC AUC improves
+        torch.save(model.state_dict(), 'best_model.pth')
+    else:
+        early_stop_counter += 1
+    
+    if early_stop_counter >= patience:
+        print("Early stopping triggered")
+        break
