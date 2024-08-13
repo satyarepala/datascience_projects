@@ -132,3 +132,37 @@ plt.title('LDA: 200D to 1D Projection')
 plt.xlabel('LDA Component 1')
 plt.legend()
 plt.show()
+
+
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+
+# Generating synthetic data for 3 classes
+np.random.seed(0)
+class_1 = np.random.randn(500, 200) + np.array([1] * 200)  # Class 1 centered at 1
+class_2 = np.random.randn(500, 200) + np.array([3] * 200)  # Class 2 centered at 3
+class_3 = np.random.randn(500, 200) + np.array([5] * 200)  # Class 3 centered at 5
+
+# Combining data into one dataset
+X = np.vstack((class_1, class_2, class_3))
+y = np.array([0] * 500 + [1] * 500 + [2] * 500)  # Labels: 0 for class 1, 1 for class 2, 2 for class 3
+
+# Initialize LDA with 2 components
+lda = LDA(n_components=2)
+
+# Fit LDA and transform the data
+X_lda = lda.fit_transform(X, y)
+
+# Visualize the result in 2D
+plt.figure(figsize=(8, 6))
+plt.scatter(X_lda[y == 0, 0], X_lda[y == 0, 1], label='Class 1', alpha=0.7)
+plt.scatter(X_lda[y == 1, 0], X_lda[y == 1, 1], label='Class 2', alpha=0.7)
+plt.scatter(X_lda[y == 2, 0], X_lda[y == 2, 1], label='Class 3', alpha=0.7)
+plt.title('LDA: 200D to 2D Projection')
+plt.xlabel('LDA Component 1')
+plt.ylabel('LDA Component 2')
+plt.legend()
+plt.show()
