@@ -74,3 +74,33 @@ print(classification_report(y, y_pred))
 # Note: Noise points (label -1) are not included in the counts
 noise_points = np.sum(dbscan_labels == -1)
 print(f"\nNumber of noise points: {noise_points}")
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+
+# Generating synthetic data
+np.random.seed(0)
+class_1 = np.random.randn(500, 200) + np.array([1] * 200)  # Class 1 centered at 1
+class_2 = np.random.randn(500, 200) + np.array([3] * 200)  # Class 2 centered at 3
+
+# Combining data into one dataset
+X = np.vstack((class_1, class_2))
+y = np.array([0] * 500 + [1] * 500)  # Labels: 0 for class 1, 1 for class 2
+
+# Initialize LDA with 2 components
+lda = LDA(n_components=2)
+
+# Fit LDA and transform the data
+X_lda = lda.fit_transform(X, y)
+
+# Visualize the result
+plt.figure(figsize=(8, 6))
+plt.scatter(X_lda[y == 0, 0], X_lda[y == 0, 1], label='Class 1', alpha=0.7)
+plt.scatter(X_lda[y == 1, 0], X_lda[y == 1, 1], label='Class 2', alpha=0.7)
+plt.title('LDA: 200D to 2D Projection')
+plt.xlabel('LDA Component 1')
+plt.ylabel('LDA Component 2')
+plt.legend()
+plt.show()
