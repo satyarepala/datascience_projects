@@ -1,0 +1,194 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset, random_split
+import numpy as np
+import matplotlib.pyplot as plt
+import pickle
+
+# Sample user-agent strings (example)
+user_agents = [
+    "Mozilla/5.0 (Linux; Android 13; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Mobile/15E148 Safari/604.1"
+]
+
+# Character-level tokenization
+tokenizer = {ch: i + 1 for i, ch in enumerate(set(''.join(user_agents)))}
+tokenizer['<PAD>'] = 0
+
+def tokenize(text, tokenizer):
+    return [tokenizer[ch] for ch in text]
+
+sequences = [tokenize(ua, tokenizer) for ua in user_agents]
+max_seq_len = max(len(seq) for seq in sequences)
+
+# Padding sequences
+padded_sequences = [seq + [0] * (max_seq_len - len(seq)) for seq in sequences]
+padded_sequences = torch.tensor(padded_sequences, dtype=torch.float32)  # Use float32 for Conv1d
+
+# Convert to tensors and create labels (identity function for demonstration)
+labels = padded_sequences.clone()
+
+# Train/validation split
+dataset = TensorDataset(padded_sequences, labels)
+train_size = int(len(dataset) * 0.8)
+val_size = len(dataset) - train_size
+train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=2, shuffle=False)
+
+# Save the tokenizer
+with open('tokenizer.pkl', 'wb') as f:
+    pickle.dump(tokenizer, f)
+
+# Parameters
+bottleneck_dim = 20  # Target bottleneck vector length
+num_filters = 128
+kernel_size = 3
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the Encoder with 1D Convolutional Layers
+class Encoder(nn.Module):
+    def __init__(self, input_dim, num_filters, kernel_size, bottleneck_dim):
+        super(Encoder, self).__init__()
+        self.conv1 = nn.Conv1d(in_channels=input_dim, out_channels=num_filters, kernel_size=kernel_size, padding=kernel_size//2)
+        self.conv2 = nn.Conv1d(in_channels=num_filters, out_channels=num_filters, kernel_size=kernel_size, padding=kernel_size//2)
+        self.conv3 = nn.Conv1d(in_channels=num_filters, out_channels=bottleneck_dim, kernel_size=kernel_size, padding=kernel_size//2)
+        
+    def forward(self, x):
+        x = self.conv1(x)
+        x = nn.ReLU()(x)
+        x = self.conv2(x)
+        x = nn.ReLU()(x)
+        x = self.conv3(x)
+        x = nn.ReLU()(x)
+        return x
+
+# Define the Decoder with 1D Convolutional Layers
+class Decoder(nn.Module):
+    def __init__(self, output_dim, num_filters, kernel_size, bottleneck_dim):
+        super(Decoder, self).__init__()
+        self.conv1 = nn.Conv1d(in_channels=bottleneck_dim, out_channels=num_filters, kernel_size=kernel_size, padding=kernel_size//2)
+        self.conv2 = nn.Conv1d(in_channels=num_filters, out_channels=num_filters, kernel_size=kernel_size, padding=kernel_size//2)
+        self.conv3 = nn.Conv1d(in_channels=num_filters, out_channels=output_dim, kernel_size=kernel_size, padding=kernel_size//2)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = nn.ReLU()(x)
+        x = self.conv2(x)
+        x = nn.ReLU()(x)
+        x = self.conv3(x)
+        x = nn.ReLU()(x)
+        return x
+
+# Autoencoder Model
+class AutoEncoder(nn.Module):
+    def __init__(self, encoder, decoder):
+        super(AutoEncoder, self).__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+        self._initialize_weights()
+
+    def forward(self, x):
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded, encoded
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv1d) or isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+# Instantiate models
+input_dim = max_seq_len  # Each character is treated as a single feature
+encoder = Encoder(input_dim, num_filters, kernel_size, bottleneck_dim).to(device)
+decoder = Decoder(input_dim, num_filters, kernel_size, bottleneck_dim).to(device)
+model = AutoEncoder(encoder, decoder).to(device)
+
+# Define the optimizer and loss function
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+criterion = nn.MSELoss()
+
+# Early stopping parameters
+patience = 3
+best_val_loss = float('inf')
+patience_counter = 0
+
+# Training the model
+num_epochs = 50
+train_losses = []
+val_losses = []
+
+for epoch in range(num_epochs):
+    model.train()
+    running_loss = 0.0
+    
+    for inputs, labels in train_loader:
+        inputs, labels = inputs.unsqueeze(1).to(device), labels.unsqueeze(1).to(device)  # Add channel dimension
+        
+        optimizer.zero_grad()
+        outputs, _ = model(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        
+        running_loss += loss.item()
+
+    train_loss = running_loss / len(train_loader)
+    train_losses.append(train_loss)
+
+    model.eval()
+    val_loss = 0.0
+    
+    with torch.no_grad():
+        for inputs, labels in val_loader:
+            inputs, labels = inputs.unsqueeze(1).to(device), labels.unsqueeze(1).to(device)
+            outputs, _ = model(inputs)
+            loss = criterion(outputs, labels)
+            val_loss += loss.item()
+    
+    val_loss /= len(val_loader)
+    val_losses.append(val_loss)
+
+    print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+
+    # Early stopping check
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        patience_counter = 0
+        # Save the best model
+        torch.save(model.state_dict(), 'best_cnn_autoencoder_model.pth')
+    else:
+        patience_counter += 1
+        if patience_counter >= patience:
+            print("Early stopping triggered!")
+            break
+
+# Plot the training and validation loss
+plt.plot(train_losses, label='Train Loss')
+plt.plot(val_losses, label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training and Validation Loss')
+plt.legend()
+plt.show()
+
+# Load the tokenizer
+with open('tokenizer.pkl', 'rb') as f:
+    loaded_tokenizer = pickle.load(f)
+
+# Load the best model
+loaded_model = AutoEncoder(encoder, decoder).to(device)
+loaded_model.load_state_dict(torch.load('best_cnn_autoencoder_model.pth'))
+
+# Get the bottleneck embeddings for a sample input
+sample_input = torch.tensor([tokenize("Mozilla/5.0 (Linux; Android 13; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36", loaded_tokenizer) + [0] * (max_seq_len - 102)], dtype=torch.float32).unsqueeze(1).to(device)
+
+_, bottleneck_embedding = loaded_model(sample_input)
+bottleneck_vector = bottleneck_embedding.squeeze(0).detach().cpu().numpy()
+print(bottleneck_vector.shape)  # Should be [20, max_seq_len]
