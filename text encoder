@@ -117,6 +117,11 @@ model = Seq2Seq(encoder, decoder).to(device)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss()
 
+# Early stopping parameters
+patience = 3
+best_val_loss = float('inf')
+patience_counter = 0
+
 # Training the model
 num_epochs = 50
 train_losses = []
@@ -155,6 +160,18 @@ for epoch in range(num_epochs):
 
     print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
 
+    # Early stopping check
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        patience_counter = 0
+        # Save the best model
+        torch.save(model.state_dict(), 'best_seq2seq_model.pth')
+    else:
+        patience_counter += 1
+        if patience_counter >= patience:
+            print("Early stopping triggered!")
+            break
+
 # Plot the training and validation loss
 plt.plot(train_losses, label='Train Loss')
 plt.plot(val_losses, label='Validation Loss')
@@ -164,16 +181,13 @@ plt.title('Training and Validation Loss')
 plt.legend()
 plt.show()
 
-# Save the model
-torch.save(model.state_dict(), 'seq2seq_model.pth')
-
 # Load the tokenizer
 with open('tokenizer.pkl', 'rb') as f:
     loaded_tokenizer = pickle.load(f)
 
-# Load the model
+# Load the best model
 loaded_model = Seq2Seq(encoder, decoder).to(device)
-loaded_model.load_state_dict(torch.load('seq2seq_model.pth'))
+loaded_model.load_state_dict(torch.load('best_seq2seq_model.pth'))
 
 # Get the bottleneck embeddings for a sample input
 sample_input = torch.tensor([tokenize("Mozilla/5.0 (Linux; Android 13; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36", loaded_tokenizer) + [0] * (max_seq_len - 102)], dtype=torch.long).unsqueeze(0).to(device)
