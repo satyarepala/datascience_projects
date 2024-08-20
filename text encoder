@@ -47,70 +47,80 @@ with open('tokenizer.pkl', 'wb') as f:
 # Parameters
 latent_dim = 64  # Latent dimensionality for LSTM
 bottleneck_dim = 20  # Target bottleneck vector length
+embedding_dim = 64  # Dimensionality of the embedding layer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define the Encoder
+# Define the Encoder with 1D Convolutional Layers
 class Encoder(nn.Module):
-    def __init__(self, vocab_size, embedding_dim, latent_dim):
+    def __init__(self, vocab_size, embedding_dim, num_filters, kernel_size, latent_dim):
         super(Encoder, self).__init__()
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.lstm = nn.LSTM(embedding_dim, latent_dim, batch_first=True)
+        self.conv1 = nn.Conv1d(in_channels=embedding_dim, out_channels=num_filters, kernel_size=kernel_size, padding=kernel_size//2)
+        self.conv2 = nn.Conv1d(in_channels=num_filters, out_channels=num_filters, kernel_size=kernel_size, padding=kernel_size//2)
+        self.conv3 = nn.Conv1d(in_channels=num_filters, out_channels=latent_dim, kernel_size=kernel_size, padding=kernel_size//2)
 
     def forward(self, x):
-        embedded = self.embedding(x)
-        outputs, (hidden, cell) = self.lstm(embedded)
-        return outputs, hidden, cell
+        embedded = self.embedding(x).permute(0, 2, 1)
+        x = self.conv1(embedded)
+        x = nn.ReLU()(x)
+        x = self.conv2(x)
+        x = nn.ReLU()(x)
+        x = self.conv3(x)
+        x = nn.ReLU()(x)
+        return x
 
-# Define the Attention Mechanism
-class Attention(nn.Module):
-    def __init__(self, latent_dim):
-        super(Attention, self).__init__()
-        self.attn = nn.Linear(latent_dim, latent_dim)
-        self.v = nn.Parameter(torch.rand(latent_dim))
-
-    def forward(self, encoder_outputs):
-        energy = torch.tanh(self.attn(encoder_outputs))
-        attention = torch.sum(energy * self.v, dim=2)
-        return torch.softmax(attention, dim=1)
-
-# Define the Decoder
+# Define the Decoder with 1D Convolutional Layers
 class Decoder(nn.Module):
-    def __init__(self, vocab_size, embedding_dim, latent_dim, bottleneck_dim):
+    def __init__(self, vocab_size, embedding_dim, num_filters, kernel_size, latent_dim, bottleneck_dim):
         super(Decoder, self).__init__()
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.lstm = nn.LSTM(embedding_dim, latent_dim, batch_first=True)
-        self.attention = Attention(latent_dim)
-        self.fc = nn.Linear(latent_dim * 2, vocab_size)
+        self.conv1 = nn.Conv1d(in_channels=latent_dim, out_channels=num_filters, kernel_size=kernel_size, padding=kernel_size//2)
+        self.conv2 = nn.Conv1d(in_channels=num_filters, out_channels=num_filters, kernel_size=kernel_size, padding=kernel_size//2)
+        self.conv3 = nn.Conv1d(in_channels=num_filters, out_channels=embedding_dim, kernel_size=kernel_size, padding=kernel_size//2)
+        self.fc = nn.Linear(embedding_dim * max_seq_len, vocab_size * max_seq_len)
         self.bottleneck = nn.Linear(latent_dim, bottleneck_dim)
 
-    def forward(self, x, encoder_outputs, hidden, cell):
-        embedded = self.embedding(x)
-        outputs, (hidden, cell) = self.lstm(embedded, (hidden, cell))
-        attn_weights = self.attention(encoder_outputs)
-        context = torch.bmm(attn_weights.unsqueeze(1), encoder_outputs).squeeze(1)
-        output = torch.cat((outputs.squeeze(1), context), dim=1)
-        predictions = self.fc(output)
-        bottleneck_vector = self.bottleneck(hidden.squeeze(0))
-        return predictions, hidden, cell, bottleneck_vector
+    def forward(self, x):
+        x = self.conv1(x)
+        x = nn.ReLU()(x)
+        x = self.conv2(x)
+        x = nn.ReLU()(x)
+        x = self.conv3(x)
+        x = nn.ReLU()(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        x = x.view(x.size(0), max_seq_len, -1)
+        bottleneck_vector = self.bottleneck(x)
+        return x, bottleneck_vector
 
-# Seq2Seq Model
+# Seq2Seq Model with CNN
 class Seq2Seq(nn.Module):
     def __init__(self, encoder, decoder):
         super(Seq2Seq, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
+        self._initialize_weights()
 
     def forward(self, src, trg):
-        encoder_outputs, hidden, cell = self.encoder(src)
-        outputs, bottleneck_vector = self.decoder(trg, encoder_outputs, hidden, cell)
+        encoded = self.encoder(src)
+        outputs, bottleneck_vector = self.decoder(encoded)
         return outputs, bottleneck_vector
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv1d) or isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
 # Instantiate models
 vocab_size = len(tokenizer)
-embedding_dim = latent_dim
+embedding_dim = 64
+num_filters = 128
+kernel_size = 3
 
-encoder = Encoder(vocab_size, embedding_dim, latent_dim).to(device)
-decoder = Decoder(vocab_size, embedding_dim, latent_dim, bottleneck_dim).to(device)
+encoder = Encoder(vocab_size, embedding_dim, num_filters, kernel_size, latent_dim).to(device)
+decoder = Decoder(vocab_size, embedding_dim, num_filters, kernel_size, latent_dim, bottleneck_dim).to(device)
 model = Seq2Seq(encoder, decoder).to(device)
 
 # Define the optimizer and loss function
@@ -165,7 +175,7 @@ for epoch in range(num_epochs):
         best_val_loss = val_loss
         patience_counter = 0
         # Save the best model
-        torch.save(model.state_dict(), 'best_seq2seq_model.pth')
+        torch.save(model.state_dict(), 'best_cnn_seq2seq_model.pth')
     else:
         patience_counter += 1
         if patience_counter >= patience:
@@ -187,10 +197,7 @@ with open('tokenizer.pkl', 'rb') as f:
 
 # Load the best model
 loaded_model = Seq2Seq(encoder, decoder).to(device)
-loaded_model.load_state_dict(torch.load('best_seq2seq_model.pth'))
+loaded_model.load_state_dict(torch.load('best_cnn_seq2seq_model.pth'))
 
 # Get the bottleneck embeddings for a sample input
-sample_input = torch.tensor([tokenize("Mozilla/5.0 (Linux; Android 13; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36", loaded_tokenizer) + [0] * (max_seq_len - 102)], dtype=torch.long).unsqueeze(0).to(device)
-_, bottleneck_vector = loaded_model(sample_input, sample_input)
-
-print("Bottleneck Embeddings for Sample Input:", bottleneck_vector.detach().cpu().numpy())
+sample_input = torch.tensor([tokenize("Mozilla/5.0 (Linux; Android 13; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36", loaded_tokenizer) + [0] * (max_seq_len - 102)], dtype=torch.long).
