@@ -364,5 +364,73 @@ class ComplexAutoencoder(nn.Module):
 # Example usage
 model = ComplexAutoencoder()
 
+class ResidualBlock(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(ResidualBlock, self).__init__()
+        self.fc1 = nn.Linear(in_features, out_features)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(out_features, out_features)
+        self.shortcut = nn.Sequential()
+        
+        # If input and output dimensions differ, we add a linear layer to match them
+        if in_features != out_features:
+            self.shortcut = nn.Sequential(
+                nn.Linear(in_features, out_features)
+            )
+    
+    def forward(self, x):
+        identity = self.shortcut(x)
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.fc2(out)
+        out += identity  # Add the input (identity) to the output
+        out = self.relu(out)
+        return out
+class ResNetAutoencoder(nn.Module):
+    def __init__(self):
+        super(ResNetAutoencoder, self).__init__()
+        
+        # Encoder
+        self.encoder = nn.Sequential(
+            nn.Linear(483, 512),
+            ResidualBlock(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            ResidualBlock(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            ResidualBlock(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            ResidualBlock(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 50)  # Bottleneck layer
+        )
+        
+        # Decoder
+        self.decoder = nn.Sequential(
+            nn.Linear(50, 64),
+            ResidualBlock(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            ResidualBlock(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 256),
+            ResidualBlock(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 512),
+            ResidualBlock(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 483),
+            nn.Sigmoid()  # Output layer with sigmoid activation
+        )
+        
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
+# Instantiate the model
+model = ResNetAutoencoder()
 
 
