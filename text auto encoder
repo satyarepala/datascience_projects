@@ -273,3 +273,43 @@ model = ComplexAutoencoder()
 # Instantiate the model
 model = Autoencoder()
 
+
+
+class Conv1DAutoencoder(nn.Module):
+    def __init__(self):
+        super(Conv1DAutoencoder, self).__init__()
+        
+        # Encoder
+        self.encoder = nn.Sequential(
+            nn.Conv1d(1, 16, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(16, 32, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(64 * 61, 50)  # Adjust the linear layer according to your input size
+        )
+        
+        # Decoder
+        self.decoder = nn.Sequential(
+            nn.Linear(50, 64 * 61),
+            nn.ReLU(),
+            nn.Unflatten(1, (64, 61)),
+            nn.ConvTranspose1d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ReLU(),
+            nn.ConvTranspose1d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ReLU(),
+            nn.ConvTranspose1d(16, 1, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.Sigmoid()
+        )
+        
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
+# Example usage
+model = Conv1DAutoencoder()
+
+
