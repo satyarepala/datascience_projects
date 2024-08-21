@@ -434,3 +434,75 @@ class ResNetAutoencoder(nn.Module):
 model = ResNetAutoencoder()
 
 
+
+
+
+import torch
+import torch.nn as nn
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_features, out_features, use_batchnorm=False, dropout_prob=0.0):
+        super(ResidualBlock, self).__init__()
+        layers = [nn.Linear(in_features, out_features), nn.ReLU()]
+        
+        if use_batchnorm:
+            layers.append(nn.BatchNorm1d(out_features))
+        
+        if dropout_prob > 0.0:
+            layers.append(nn.Dropout(dropout_prob))
+        
+        layers.append(nn.Linear(out_features, out_features))
+        
+        if use_batchnorm:
+            layers.append(nn.BatchNorm1d(out_features))
+        
+        self.block = nn.Sequential(*layers)
+        self.shortcut = nn.Sequential()
+        
+        if in_features != out_features:
+            self.shortcut = nn.Sequential(
+                nn.Linear(in_features, out_features)
+            )
+    
+    def forward(self, x):
+        identity = self.shortcut(x)
+        out = self.block(x)
+        out += identity
+        out = torch.relu(out)
+        return out
+
+class ResNetAutoencoder(nn.Module):
+    def __init__(self, layer_sizes=[512, 256, 128, 64, 50], 
+                 use_batchnorm=False, dropout_prob=0.0):
+        super(ResNetAutoencoder, self).__init__()
+        
+        # Encoder
+        encoder_layers = []
+        in_features = 483
+        for out_features in layer_sizes:
+            encoder_layers.append(nn.Linear(in_features, out_features))
+            encoder_layers.append(ResidualBlock(out_features, out_features, use_batchnorm, dropout_prob))
+            encoder_layers.append(nn.ReLU())
+            in_features = out_features
+        self.encoder = nn.Sequential(*encoder_layers)
+        
+        # Decoder
+        decoder_layers = []
+        layer_sizes.reverse()
+        in_features = layer_sizes[0]
+        for out_features in layer_sizes[1:] + [483]:
+            decoder_layers.append(nn.Linear(in_features, out_features))
+            decoder_layers.append(ResidualBlock(out_features, out_features, use_batchnorm, dropout_prob))
+            decoder_layers.append(nn.ReLU())
+            in_features = out_features
+        decoder_layers[-1] = nn.Sigmoid()  # Output layer with sigmoid activation
+        self.decoder = nn.Sequential(*decoder_layers)
+        
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
+# Example usage:
+model = ResNetAutoencoder(layer_sizes=[512, 256, 128, 64, 50], use_batchnorm=True, dropout_prob=0.3)
+
