@@ -192,3 +192,42 @@ sample_input = torch.tensor([tokenize("Mozilla/5.0 (Linux; Android 13; SM-G991U)
 _, bottleneck_embedding = loaded_model(sample_input)
 bottleneck_vector = bottleneck_embedding.squeeze(0).detach().cpu().numpy()
 print(bottleneck_vector.shape)  # Should be [20, max_seq_len]
+
+
+
+
+class Autoencoder(nn.Module):
+    def __init__(self):
+        super(Autoencoder, self).__init__()
+        
+        # Encoder
+        self.encoder = nn.Sequential(
+            nn.Linear(483, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 50)  # Bottleneck layer
+        )
+        
+        # Decoder
+        self.decoder = nn.Sequential(
+            nn.Linear(50, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 256),
+            nn.ReLU(),
+            nn.Linear(256, 483),
+            nn.Sigmoid()  # Output layer with sigmoid activation
+        )
+        
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
+# Instantiate the model
+model = Autoencoder()
+
