@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as FUNC
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, dropout_prob=0.2):
@@ -18,11 +18,11 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         residual = self.residual(x)
-        out = F.relu(self.bn1(self.conv1(x)))
+        out = FUNC.relu(self.bn1(self.conv1(x)))
         out = self.dropout(out)
         out = self.bn2(self.conv2(out))
         out += residual
-        return F.relu(out)
+        return FUNC.relu(out)
 
 class Autoencoder(nn.Module):
     def __init__(self, input_shape, dropout_prob=0.2):
