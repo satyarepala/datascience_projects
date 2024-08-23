@@ -1,0 +1,94 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as FUNC
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_features, out_features, dropout_prob=0.2):
+        super(ResidualBlock, self).__init__()
+        self.fc1 = nn.Linear(in_features, out_features)
+        self.fc2 = nn.Linear(out_features, out_features)
+        self.fc3 = nn.Linear(out_features, out_features)
+        self.dropout = nn.Dropout(dropout_prob)
+
+        if in_features != out_features:
+            self.residual = nn.Linear(in_features, out_features)
+        else:
+            self.residual = nn.Identity()
+
+    def forward(self, x):
+        residual = self.residual(x)
+        out = FUNC.relu(self.fc1(x))
+        out = self.dropout(out)
+        out = FUNC.relu(self.fc2(out))
+        out = self.fc3(out)
+        out += residual
+        return FUNC.relu(out)
+
+class FullyConnectedAutoencoder(nn.Module):
+    def __init__(self, input_shape, dropout_prob=0.2, bottleneck_dim=200):
+        super(FullyConnectedAutoencoder, self).__init__()
+        self.input_shape = input_shape
+        self.input_dim = input_shape[0] * input_shape[1]  # Flatten the input
+        
+        # Encoder
+        self.encoder = nn.Sequential(
+            ResidualBlock(in_features=self.input_dim, out_features=1024, dropout_prob=dropout_prob),
+            ResidualBlock(in_features=1024, out_features=512, dropout_prob=dropout_prob),
+            ResidualBlock(in_features=512, out_features=256, dropout_prob=dropout_prob)
+        )
+
+        # Bottleneck
+        self.fc1 = nn.Linear(256, bottleneck_dim)
+        self.fc2 = nn.Linear(bottleneck_dim, 256)
+
+        # Decoder
+        self.decoder = nn.Sequential(
+            ResidualBlock(in_features=256, out_features=512, dropout_prob=dropout_prob),
+            ResidualBlock(in_features=512, out_features=1024, dropout_prob=dropout_prob),
+            ResidualBlock(in_features=1024, out_features=self.input_dim, dropout_prob=dropout_prob)
+        )
+
+    def forward(self, x):
+        # Flatten the input
+        x_flat = x.view(x.size(0), -1)
+        
+        # Encoder
+        encoded = self.encoder(x_flat)
+        
+        # Bottleneck
+        bottleneck = FUNC.relu(self.fc1(encoded))
+        bottleneck_output = FUNC.relu(self.fc2(bottleneck))
+        
+        # Decoder
+        decoded = self.decoder(bottleneck_output)
+        
+        # Reshape to original input shape
+        output = decoded.view(x.size(0), *self.input_shape)
+        return output
+
+    def get_bottleneck_representation(self, x):
+        # Flatten the input
+        x_flat = x.view(x.size(0), -1)
+        
+        # Encoder
+        encoded = self.encoder(x_flat)
+        
+        # Bottleneck
+        bottleneck = FUNC.relu(self.fc1(encoded))
+        return bottleneck
+
+# Define input shape and create the model
+input_shape = (7, 100)  # Example input shape, changeable as needed
+dropout_prob = 0.3
+bottleneck_dim = 200
+
+model = FullyConnectedAutoencoder(input_shape, dropout_prob=dropout_prob, bottleneck_dim=bottleneck_dim)
+
+# Sample input to test the architecture
+sample_input = torch.randn(1, 1, *input_shape)  # Batch size 1, single channel, e.g., 7x100 matrix
+sample_input_flat = sample_input.view(sample_input.size(0), -1)  # Flatten the input for the model
+bottleneck_representation = model.get_bottleneck_representation(sample_input)
+output = model(sample_input)
+
+print("Bottleneck shape:", bottleneck_representation.shape)
+print("Output shape:", output.shape)
