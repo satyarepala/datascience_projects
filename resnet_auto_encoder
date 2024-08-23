@@ -105,3 +105,121 @@ output = model(sample_input)
 
 print("Input shape:", sample_input.shape)
 print("Output shape:", output.shape)
+
+
+
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as FUNC
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3, dropout_prob=0.2):
+        super(ResidualBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size, padding=1)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size, padding=1)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.conv3 = nn.Conv2d(out_channels, out_channels, kernel_size, padding=1)
+        self.bn3 = nn.BatchNorm2d(out_channels)
+        self.dropout = nn.Dropout(dropout_prob)
+
+        if in_channels != out_channels:
+            self.residual = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        else:
+            self.residual = nn.Identity()
+
+    def forward(self, x):
+        residual = self.residual(x)
+        out = FUNC.relu(self.bn1(self.conv1(x)))
+        out = self.dropout(out)
+        out = FUNC.relu(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        out += residual
+        return FUNC.relu(out)
+
+class Autoencoder(nn.Module):
+    def __init__(self, input_shape, dropout_prob=0.2, bottleneck_dim=200):
+        super(Autoencoder, self).__init__()
+        self.input_shape = input_shape
+        
+        # Encoder
+        self.encoder = nn.Sequential(
+            ResidualBlock(in_channels=1, out_channels=32, dropout_prob=dropout_prob),
+            nn.MaxPool2d(2),
+            ResidualBlock(in_channels=32, out_channels=64, dropout_prob=dropout_prob),
+            nn.MaxPool2d(2),
+            ResidualBlock(in_channels=64, out_channels=128, dropout_prob=dropout_prob),
+            ResidualBlock(in_channels=128, out_channels=256, dropout_prob=dropout_prob)
+        )
+        
+        # Flatten layer
+        self.flatten = nn.Flatten()
+
+        # Calculate the flatten size dynamically based on input shape
+        self.flatten_size = self._get_flatten_size()
+
+        # Bottleneck layer
+        self.fc1 = nn.Linear(self.flatten_size, bottleneck_dim)
+        self.fc2 = nn.Linear(bottleneck_dim, self.flatten_size)
+
+        # Decoder
+        self.decoder = nn.Sequential(
+            ResidualBlock(in_channels=256, out_channels=128, dropout_prob=dropout_prob),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            ResidualBlock(in_channels=128, out_channels=64, dropout_prob=dropout_prob),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            ResidualBlock(in_channels=64, out_channels=32, dropout_prob=dropout_prob),
+            ResidualBlock(in_channels=32, out_channels=1, dropout_prob=dropout_prob)
+        )
+
+    def _get_flatten_size(self):
+        # Dummy input to compute the output size of the encoder layers
+        dummy_input = torch.randn(1, 1, *self.input_shape)
+        encoded_output = self.encoder(dummy_input)
+        flatten_size = encoded_output.numel() // encoded_output.size(0)  # Total number of features
+        return flatten_size
+        
+    def forward(self, x):
+        # Encoder
+        encoded = self.encoder(x)
+        encoded_flat = self.flatten(encoded)  # Flatten
+        
+        # Bottleneck
+        bottleneck = FUNC.relu(self.fc1(encoded_flat))
+        bottleneck_output = FUNC.relu(self.fc2(bottleneck))
+        
+        # Reshape to convolution output shape
+        decoded_input = bottleneck_output.view(encoded.size(0), 256, encoded.size(2), encoded.size(3))
+        
+        # Decoder
+        decoded = self.decoder(decoded_input)
+        
+        # Ensure output shape matches input shape
+        output = FUNC.interpolate(decoded, size=self.input_shape, mode='bilinear', align_corners=True)
+        return output
+
+    def get_bottleneck_representation(self, x):
+        # Encoder
+        encoded = self.encoder(x)
+        encoded_flat = self.flatten(encoded)  # Flatten
+
+        # Bottleneck
+        bottleneck = FUNC.relu(self.fc1(encoded_flat))
+        return bottleneck
+
+# Define input shape and create the model
+input_shape = (7, 100)  # Example input shape, changeable as needed
+dropout_prob = 0.3
+bottleneck_dim = 200
+
+model = Autoencoder(input_shape, dropout_prob=dropout_prob, bottleneck_dim=bottleneck_dim)
+
+# Sample input to test the architecture
+sample_input = torch.randn(1, 1, *input_shape)  # Batch size 1, single channel, e.g., 7x100 matrix
+bottleneck_representation, output = model(sample_input)
+
+print("Bottleneck shape:", bottleneck_representation.shape)
+print("Output shape:", output.shape)
+
