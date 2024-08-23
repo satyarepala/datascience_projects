@@ -83,6 +83,15 @@ class Autoencoder(nn.Module):
         output = FUNC.interpolate(decoded, size=self.input_shape, mode='bilinear', align_corners=True)
         return output
 
+    def get_bottleneck_representation(self, x):
+        # Encoder
+        encoded = self.encoder(x)
+        encoded_flat = self.flatten(encoded)  # Flatten
+
+        # Bottleneck
+        bottleneck = FUNC.relu(self.fc1(encoded_flat))
+        return bottleneck
+
 # Define input shape and create the model
 input_shape = (7, 100)  # Example input shape, changeable as needed
 dropout_prob = 0.3
