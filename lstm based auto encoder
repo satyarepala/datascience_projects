@@ -1,0 +1,61 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as FUNC
+
+class RecurrentAutoencoder(nn.Module):
+    def __init__(self, input_dim, hidden_dim, bottleneck_dim, num_layers, dropout_prob=0.2):
+        super(RecurrentAutoencoder, self).__init__()
+
+        # Encoder: LSTM
+        self.encoder = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout_prob, bidirectional=True)
+        self.bottleneck = nn.Linear(hidden_dim * 2, bottleneck_dim)  # *2 for bidirectional
+
+        # Decoder: LSTM
+        self.decoder = nn.LSTM(bottleneck_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout_prob, bidirectional=True)
+        self.output_layer = nn.Linear(hidden_dim * 2, input_dim)  # Output to match the input dimension
+
+    def forward(self, x):
+        # Encoding
+        packed_output, (hidden, cell) = self.encoder(x)
+        hidden_forward = hidden[-2, :, :]
+        hidden_backward = hidden[-1, :, :]
+        hidden_combined = torch.cat((hidden_forward, hidden_backward), dim=1)
+        bottleneck_output = FUNC.relu(self.bottleneck(hidden_combined))
+
+        # Repeat bottleneck for each time step
+        bottleneck_repeated = bottleneck_output.unsqueeze(1).repeat(1, x.size(1), 1)
+
+        # Decoding
+        decoded_output, _ = self.decoder(bottleneck_repeated)
+        decoded = self.output_layer(decoded_output)
+
+        return decoded
+
+    def get_bottleneck_representation(self, x):
+        # Encoder: Get hidden states
+        packed_output, (hidden, cell) = self.encoder(x)
+        hidden_forward = hidden[-2, :, :]
+        hidden_backward = hidden[-1, :, :]
+        hidden_combined = torch.cat((hidden_forward, hidden_backward), dim=1)
+        bottleneck_output = FUNC.relu(self.bottleneck(hidden_combined))
+        return bottleneck_output
+
+# Example usage
+input_dim = 7  # Number of features
+hidden_dim = 64  # LSTM hidden dimension
+bottleneck_dim = 200  # Bottleneck size
+num_layers = 2  # Number of LSTM layers
+dropout_prob = 0.3
+
+model = RecurrentAutoencoder(input_dim, hidden_dim, bottleneck_dim, num_layers, dropout_prob)
+
+# Variable length sequences
+seq1 = torch.randn(1, 50, input_dim)  # Batch size 1, sequence length 50, input dimension 7
+seq2 = torch.randn(1, 34, input_dim)  # Batch size 1, sequence length 34, input dimension 7
+
+# Pass through model
+output1 = model(seq1)
+output2 = model(seq2)
+
+print("Output1 shape:", output1.shape)
+print("Output2 shape:", output2.shape)
