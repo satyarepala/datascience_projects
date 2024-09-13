@@ -1,0 +1,100 @@
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingClassifier, AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
+from imblearn.ensemble import EasyEnsembleClassifier
+
+def calculate_class_weights(list1, list2):
+    # Calculate class weights based on number of samples
+    n_class1 = len(list1)  # Class 1
+    n_class2 = len(list2)  # Class 0
+    total = n_class1 + n_class2
+    
+    class_weight_1 = total / n_class1  # For class 1 (label 1)
+    class_weight_0 = total / n_class2  # For class 0 (label 0)
+    
+    return {0: class_weight_0, 1: class_weight_1}
+
+def boosting_classification(list1, list2, algorithm='AdaBoost', class_weights=None):
+    # Combine the two lists and create labels
+    X = np.array(list1 + list2)  # Concatenate the data
+    y = np.array([1] * len(list1) + [0] * len(list2))  # Labels (1 for list1, 0 for list2)
+
+    # Split data into train and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    
+    # Select the boosting algorithm
+    if algorithm == 'AdaBoost':
+        base_estimator = DecisionTreeClassifier(max_depth=1, class_weight=class_weights)
+        model = AdaBoostClassifier(base_estimator=base_estimator, n_estimators=100, random_state=42)
+    elif algorithm == 'GradientBoost':
+        model = GradientBoostingClassifier(n_estimators=100, random_state=42)
+        # GradientBoostingClassifier doesn't directly support class_weight, you can adjust sample weights here.
+    elif algorithm == 'XGBoost':
+        scale_pos_weight = class_weights[1] / class_weights[0] if class_weights else 1
+        model = XGBClassifier(n_estimators=100, random_state=42, use_label_encoder=False, eval_metric='logloss', scale_pos_weight=scale_pos_weight)
+    elif algorithm == 'LightGBM':
+        if class_weights:
+            model = LGBMClassifier(n_estimators=100, random_state=42, is_unbalance=True)
+        else:
+            model = LGBMClassifier(n_estimators=100, random_state=42)
+    elif algorithm == 'BrownBoost':
+        model = EasyEnsembleClassifier(n_estimators=100, random_state=42)
+    elif algorithm == 'StochasticGradientBoost':
+        model = GradientBoostingClassifier(n_estimators=100, subsample=0.5, random_state=42)
+    else:
+        raise ValueError("Unsupported algorithm! Use 'AdaBoost', 'GradientBoost', 'XGBoost', 'LightGBM', 'BrownBoost', or 'StochasticGradientBoost'.")
+    
+    # Fit the model
+    model.fit(X_train, y_train)
+    
+    # Predict on the test set
+    y_pred = model.predict(X_test)
+    
+    # Compute confusion matrix
+    tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
+    
+    # Print confusion matrix and TP, FP, TN, FN
+    print(f"\nAlgorithm: {algorithm}")
+    print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_pred)}")
+    print(f"True Positives (TP): {tp}")
+    print(f"False Positives (FP): {fp}")
+    print(f"True Negatives (TN): {tn}")
+    print(f"False Negatives (FN): {fn}")
+    
+    # Calculate and return scores
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred)
+    recall = recall_score(y_test, y_pred)
+    
+    return {
+        'algorithm': algorithm,
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'tp': tp,
+        'fp': fp,
+        'tn': tn,
+        'fn': fn
+    }
+
+# Example usage with multiple boosting algorithms and calculated class weights
+list1 = [np.random.rand(200) for _ in range(500)]  # 500 points for class 1
+list2 = [np.random.rand(200) for _ in range(5000)]  # 5000 points for class 0
+
+# Automatically calculate class weights
+class_weights = calculate_class_weights(list1, list2)
+
+algorithms = ['AdaBoost', 'GradientBoost', 'XGBoost', 'LightGBM', 'BrownBoost', 'StochasticGradientBoost']
+results = []
+
+for algo in algorithms:
+    result = boosting_classification(list1, list2, algorithm=algo, class_weights=class_weights)
+    results.append(result)
+
+# Display all results
+for result in results:
+    print(result)
