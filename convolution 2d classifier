@@ -41,6 +41,9 @@ train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
 
 # Define the model
+import torch.nn.init as init
+
+# Define the model
 class Conv2DClassifier(nn.Module):
     def __init__(self):
         super(Conv2DClassifier, self).__init__()
@@ -60,8 +63,23 @@ class Conv2DClassifier(nn.Module):
         out = self.fc3(representation)
         return out, representation  # Return logits and representation
 
+# Custom weight initialization function
+def initialize_weights(m):
+    if isinstance(m, nn.Conv2d):
+        init.kaiming_normal_(m.weight, nonlinearity='relu')
+        if m.bias is not None:
+            init.constant_(m.bias, 0)
+    elif isinstance(m, nn.Linear):
+        init.xavier_normal_(m.weight)
+        if m.bias is not None:
+            init.constant_(m.bias, 0)
+
 # Model, Loss, Optimizer
 model = Conv2DClassifier()
+
+# Apply the weight initialization
+model.apply(initialize_weights)
+
 
 # Calculate class weights
 class_weights = compute_class_weight('balanced', classes=np.unique(y_train), y=y_train)
