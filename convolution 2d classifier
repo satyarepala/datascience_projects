@@ -1,0 +1,129 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
+import matplotlib.pyplot as plt
+
+# Sample dataset (replace with actual data)
+class1_data = np.random.rand(10000, 100, 57)
+class2_data = np.random.rand(400, 100, 57)
+
+# Labels
+labels_class1 = np.zeros(10000)
+labels_class2 = np.ones(400)
+
+# Combine data
+X = np.concatenate((class1_data, class2_data), axis=0)
+y = np.concatenate((labels_class1, labels_class2), axis=0)
+
+# Split data into train and validation sets
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# Convert to PyTorch Dataset
+class CustomDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = torch.tensor(X, dtype=torch.float32).unsqueeze(1)  # Add channel dimension
+        self.y = torch.tensor(y, dtype=torch.long)
+    
+    def __len__(self):
+        return len(self.X)
+    
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+
+train_dataset = CustomDataset(X_train, y_train)
+val_dataset = CustomDataset(X_val, y_val)
+
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
+
+# Define the model
+class Conv2DClassifier(nn.Module):
+    def __init__(self):
+        super(Conv2DClassifier, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=(3, 3), padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=(3, 3), padding=1)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(64 * 50 * 28, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, 2)  # Output layer for binary classification
+    
+    def forward(self, x):
+        x = self.pool(torch.relu(self.conv1(x)))
+        x = self.pool(torch.relu(self.conv2(x)))
+        x = x.view(-1, 64 * 50 * 28)  # Flatten
+        x = torch.relu(self.fc1(x))
+        representation = torch.relu(self.fc2(x))  # Feature representation
+        out = self.fc3(representation)
+        return out, representation  # Return logits and representation
+
+# Model, Loss, Optimizer
+model = Conv2DClassifier()
+
+# Calculate class weights
+class_weights = compute_class_weight('balanced', classes=np.unique(y_train), y=y_train)
+class_weights = torch.tensor(class_weights, dtype=torch.float32)
+
+criterion = nn.CrossEntropyLoss(weight=class_weights)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Early Stopping Parameters
+early_stopping_patience = 5
+best_val_loss = float('inf')
+patience_counter = 0
+
+# Training and Validation Loop
+def train_model(model, train_loader, val_loader, criterion, optimizer, epochs=50):
+    train_losses, val_losses = [], []
+    
+    for epoch in range(epochs):
+        model.train()
+        running_loss = 0.0
+        for inputs, labels in train_loader:
+            optimizer.zero_grad()
+            outputs, _ = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+        
+        train_loss = running_loss / len(train_loader)
+        train_losses.append(train_loss)
+        
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for inputs, labels in val_loader:
+                outputs, _ = model(inputs)
+                loss = criterion(outputs, labels)
+                val_loss += loss.item()
+        
+        val_loss /= len(val_loader)
+        val_losses.append(val_loss)
+        
+        print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+        
+        # Early stopping logic
+        global best_val_loss, patience_counter
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= early_stopping_patience:
+                print("Early stopping triggered.")
+                break
+    
+    # Plotting the losses
+    plt.plot(train_losses, label="Train Loss")
+    plt.plot(val_losses, label="Val Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.show()
+
+# Train the model
+train_model(model, train_loader, val_loader, criterion, optimizer, epochs=50)
