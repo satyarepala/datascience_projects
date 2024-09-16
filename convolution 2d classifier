@@ -50,17 +50,17 @@ class Conv2DClassifier(nn.Module):
         self.conv1 = nn.Conv2d(1, 32, kernel_size=(3, 3), padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=(3, 3), padding=1)
         self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(64 * 50 * 28, 128)
+        self.fc1 = nn.Linear(64 * 25 * 14, 128)  # Updated dimensions after pooling
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 2)  # Output layer for binary classification
     
     def forward(self, x):
-        x = self.pool(torch.relu(self.conv1(x)))
-        x = self.pool(torch.relu(self.conv2(x)))
-        x = x.view(-1, 64 * 50 * 28)  # Flatten
-        x = torch.relu(self.fc1(x))
-        representation = torch.relu(self.fc2(x))  # Feature representation
-        out = self.fc3(representation)
+        x = self.pool(torch.relu(self.conv1(x)))  # (64, 32, 50, 28)
+        x = self.pool(torch.relu(self.conv2(x)))  # (64, 64, 25, 14)
+        x = x.view(-1, 64 * 25 * 14)  # Flatten to (64, 64 * 25 * 14)
+        x = torch.relu(self.fc1(x))   # (64, 128)
+        representation = torch.relu(self.fc2(x))  # (64, 64) feature representation
+        out = self.fc3(representation)  # (64, 2) output logits for classification
         return out, representation  # Return logits and representation
 
 # Custom weight initialization function
