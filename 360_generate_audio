@@ -1,47 +1,28 @@
-from transformers import SpeechT5Processor, SpeechT5ForTextToSpeech
+from transformers import pipeline
 from datasets import load_dataset
-from scipy.io.wavfile import write
+import soundfile as sf
 from pydub import AudioSegment
-import torch
 import io
 import numpy as np
 
-# Load processor and model for text-to-speech
-processor = SpeechT5Processor.from_pretrained("microsoft/speecht5_tts")
-model = SpeechT5ForTextToSpeech.from_pretrained("microsoft/speecht5_tts")
+# Initialize the text-to-speech pipeline
+synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts")
 
-# Load speaker embeddings (pre-trained for the TTS model)
+# Load speaker embeddings
 embeddings_dataset = load_dataset("Matthijs/cmu-arctic-xvectors", split="validation")
-speaker_embeddings = torch.tensor(embeddings_dataset[0]["xvector"]).unsqueeze(0)
+speaker_embedding = torch.tensor(embeddings_dataset[7306]["xvector"]).unsqueeze(0)
+# You can replace this embedding with your own as well.
 
-def generate_audio(text,save_path):
-  
-  # Preprocess the input text
-  inputs = processor(text=text, return_tensors="pt")
+# Generate speech
+speech = synthesiser("Hello, my dog is cooler than you!", forward_params={"speaker_embeddings": speaker_embedding})
 
-  # Generate speech (waveform) from the text
-  with torch.no_grad():
-      speech = model.generate_speech(inputs["input_ids"], speaker_embeddings)
+# Save the speech to a WAV file
+wav_buffer = io.BytesIO()
+sf.write(wav_buffer, speech["audio"], samplerate=speech["sampling_rate"], format='wav')
+wav_buffer.seek(0)
 
-  # Convert the speech tensor to a 1-channel mono waveform
-  speech_np = speech.numpy()
+# Convert the WAV file to MP3
+audio = AudioSegment.from_file(wav_buffer, format="wav")
+audio.export("speech.mp3", format="mp3")
 
-  # Ensure the waveform is in the correct format (e.g., mono, 16-bit)
-  if speech_np.ndim > 1:  # Check if there are multiple channels
-      speech_np = speech_np.mean(axis=1)  # Convert to mono by averaging across channels
-
-  # Convert to 16-bit PCM for WAV format compatibility
-  speech_np = np.int16(speech_np / np.max(np.abs(speech_np)) * 32767)  # Normalize and convert to int16
-
-  # Save the waveform to a WAV file
-  wav_buffer = io.BytesIO()
-  sample_rate = 16000  # Typically 16kHz for TTS models
-  write(wav_buffer, sample_rate, speech_np)
-  wav_buffer.seek(0)
-
-  # Load the generated audio (WAV) into pydub and convert to MP3
-  audio = AudioSegment.from_file(wav_buffer, format="wav")
-  audio.export("output.mp3", format="mp3")
-
-  print("Audio generated and saved as output.mp3")
-
+print("Audio generated and saved as speech.mp3")
