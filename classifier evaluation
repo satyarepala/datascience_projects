@@ -1,9 +1,12 @@
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, average_precision_score
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, average_precision_score
 
 # Assuming you have your labels and predictions in these lists:
 # Replace 'labels' and 'preds' with your actual data
 labels = [...]  # true labels
 preds = [...]   # predicted labels or probabilities for binary classification
+
+# Confusion matrix to get TP, FP, TN, FN
+tn, fp, fn, tp = confusion_matrix(labels, preds).ravel()
 
 # Calculate the metrics
 accuracy = accuracy_score(labels, preds)
@@ -18,6 +21,10 @@ roc_auc = roc_auc_score(labels, preds)
 prc_auc = average_precision_score(labels, preds)
 
 # Print all the metrics
+print(f"True Positives (TP): {tp}")
+print(f"False Positives (FP): {fp}")
+print(f"True Negatives (TN): {tn}")
+print(f"False Negatives (FN): {fn}")
 print(f"Accuracy: {accuracy:.4f}")
 print(f"Precision: {precision:.4f}")
 print(f"Recall: {recall:.4f}")
