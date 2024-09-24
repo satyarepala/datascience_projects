@@ -213,3 +213,16 @@ import numpy as np
 
 # Train the model
 train_model(model, train_loader, val_loader, criterion, optimizer, epochs=50)
+
+
+
+
+# Function to calculate the model size
+def calculate_model_size(model):
+    total_params = sum(p.numel() for p in model.parameters())
+    # Assuming parameters are of type float32 (4 bytes)
+    model_size = total_params * 4 / (1024 ** 2)  # Convert bytes to MB
+    return total_params, model_size
+
+# Calculate the model size
+params, size_mb = calculate_model_size(model)
