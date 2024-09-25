@@ -32,9 +32,9 @@ X_train, X_val, y_train, y_val = train_test_split(data, labels, test_size=0.2, r
 
 # Convert to PyTorch tensors
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
-y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
+y_train_tensor = torch.tensor(y_train, dtype=torch.long)  # Long dtype for CrossEntropyLoss
 X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
-y_val_tensor = torch.tensor(y_val, dtype=torch.float32)
+y_val_tensor = torch.tensor(y_val, dtype=torch.long)  # Long dtype for CrossEntropyLoss
 
 # Create TensorDataset and DataLoader
 train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
@@ -42,7 +42,7 @@ val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-# Attention-based classifier
+# Attention-based classifier with CrossEntropyLoss
 class AttentionClassifier(nn.Module):
     def __init__(self, input_size, hidden_size, num_heads, output_size):
         super(AttentionClassifier, self).__init__()
@@ -60,25 +60,25 @@ class AttentionClassifier(nn.Module):
         x = self.relu(x)
         x = self.dropout(x)
         x = self.fc2(x)
-        return torch.sigmoid(x)  # Binary classification output
+        return x  # No sigmoid for CrossEntropyLoss
 
 # Model parameters
 input_size = 500
 hidden_size = 128
 num_heads = 4
-output_size = 1
+output_size = 2  # Binary classification (2 logits for 2 classes)
 
 model = AttentionClassifier(input_size, hidden_size, num_heads, output_size)
 
 # Loss function and optimizer
 # Compute class weights based on the number of points in each class
-class_weights = torch.tensor([class1_size / (class0_size + class1_size), class0_size / (class0_size + class1_size)])
-criterion = nn.BCELoss(weight=class_weights[1])  # Using class weight for positive class
+class_weights = torch.tensor([class0_size / (class0_size + class1_size), class1_size / (class0_size + class1_size)])
+criterion = nn.CrossEntropyLoss(weight=class_weights)  # Using class weights for imbalance
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # Metrics functions
 def compute_metrics(y_true, y_pred_probs, threshold=0.5):
-    y_pred = (y_pred_probs >= threshold) #.float()
+    y_pred = (y_pred_probs >= threshold).astype(int)
     
     # Confusion Matrix
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
@@ -105,14 +105,17 @@ for epoch in range(num_epochs):
     
     for inputs, labels in train_loader:
         optimizer.zero_grad()
-        outputs = model(inputs).squeeze()
+        outputs = model(inputs)  # Logits from the model
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
         
         train_loss += loss.item() * inputs.size(0)
+        
+        # For metrics, get predictions as probabilities using softmax
+        y_pred_probs = torch.softmax(outputs, dim=1)[:, 1].detach().numpy()
         y_true_train.append(labels.detach().numpy())
-        y_pred_probs_train.append(outputs.detach().numpy())
+        y_pred_probs_train.append(y_pred_probs)
     
     train_loss /= len(train_loader.dataset)
     y_true_train = np.concatenate(y_true_train)
@@ -129,11 +132,13 @@ for epoch in range(num_epochs):
     
     with torch.no_grad():
         for inputs, labels in val_loader:
-            outputs = model(inputs).squeeze()
+            outputs = model(inputs)
             loss = criterion(outputs, labels)
             val_loss += loss.item() * inputs.size(0)
+            
+            y_pred_probs = torch.softmax(outputs, dim=1)[:, 1].detach().numpy()
             y_true_val.append(labels.detach().numpy())
-            y_pred_probs_val.append(outputs.detach().numpy())
+            y_pred_probs_val.append(y_pred_probs)
     
     val_loss /= len(val_loader.dataset)
     y_true_val = np.concatenate(y_true_val)
@@ -147,4 +152,3 @@ for epoch in range(num_epochs):
     print(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
     print(f"Train Precision: {precision_train:.4f}, Recall: {recall_train:.4f}, TP: {tp_train}, FP: {fp_train}, TN: {tn_train}, FN: {fn_train}, AUC-ROC: {auc_roc_train:.4f}, PRC-AUC: {prc_auc_train:.4f}")
     print(f"Val Precision: {precision_val:.4f}, Recall: {recall_val:.4f}, TP: {tp_val}, FP: {fp_val}, TN: {tn_val}, FN: {fn_val}, AUC-ROC: {auc_roc_val:.4f}, PRC-AUC: {prc_auc_val:.4f}")
-
