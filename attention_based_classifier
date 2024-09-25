@@ -1,0 +1,150 @@
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, roc_auc_score, roc_curve, auc, average_precision_score
+from torch.utils.data import DataLoader, TensorDataset
+import matplotlib.pyplot as plt
+
+# Generate synthetic data
+def create_data(class0_size, class1_size, vector_size):
+    class0_data = np.random.randn(class0_size, vector_size)
+    class1_data = np.random.randn(class1_size, vector_size)
+
+    class0_labels = np.zeros(class0_size)
+    class1_labels = np.ones(class1_size)
+
+    data = np.concatenate((class0_data, class1_data), axis=0)
+    labels = np.concatenate((class0_labels, class1_labels), axis=0)
+
+    return data, labels
+
+# Create random data
+class0_size = 1000  # Number of samples in class 0 (label 0)
+class1_size = 100   # Number of samples in class 1 (label 1)
+vector_size = 500   # Size of each vector (dimensionality)
+
+data, labels = create_data(class0_size, class1_size, vector_size)
+
+# Split into train and validation sets
+X_train, X_val, y_train, y_val = train_test_split(data, labels, test_size=0.2, random_state=42, stratify=labels)
+
+# Convert to PyTorch tensors
+X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
+X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
+y_val_tensor = torch.tensor(y_val, dtype=torch.float32)
+
+# Create TensorDataset and DataLoader
+train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+# Attention-based classifier
+class AttentionClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size, num_heads, output_size):
+        super(AttentionClassifier, self).__init__()
+        self.multihead_attention = nn.MultiheadAttention(embed_dim=input_size, num_heads=num_heads, batch_first=True)
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, output_size)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.1)
+    
+    def forward(self, x):
+        x = x.unsqueeze(1)  # Add sequence length dimension
+        attn_output, _ = self.multihead_attention(x, x, x)
+        attn_output = attn_output.squeeze(1)  # Remove sequence length dimension
+        x = self.fc1(attn_output)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return torch.sigmoid(x)  # Binary classification output
+
+# Model parameters
+input_size = 500
+hidden_size = 128
+num_heads = 4
+output_size = 1
+
+model = AttentionClassifier(input_size, hidden_size, num_heads, output_size)
+
+# Loss function and optimizer
+# Compute class weights based on the number of points in each class
+class_weights = torch.tensor([class1_size / (class0_size + class1_size), class0_size / (class0_size + class1_size)])
+criterion = nn.BCELoss(weight=class_weights[1])  # Using class weight for positive class
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Metrics functions
+def compute_metrics(y_true, y_pred_probs, threshold=0.5):
+    y_pred = (y_pred_probs >= threshold) #.float()
+    
+    # Confusion Matrix
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    
+    # Precision, Recall
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
+    
+    # AUC-ROC
+    auc_roc = roc_auc_score(y_true, y_pred_probs)
+    
+    # AUC-PRC
+    prc_auc = average_precision_score(y_true, y_pred_probs)
+    
+    return precision, recall, tn, fp, fn, tp, auc_roc, prc_auc
+
+# Training loop
+num_epochs = 10
+for epoch in range(num_epochs):
+    model.train()
+    train_loss = 0.0
+    y_true_train = []
+    y_pred_probs_train = []
+    
+    for inputs, labels in train_loader:
+        optimizer.zero_grad()
+        outputs = model(inputs).squeeze()
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        
+        train_loss += loss.item() * inputs.size(0)
+        y_true_train.append(labels.detach().numpy())
+        y_pred_probs_train.append(outputs.detach().numpy())
+    
+    train_loss /= len(train_loader.dataset)
+    y_true_train = np.concatenate(y_true_train)
+    y_pred_probs_train = np.concatenate(y_pred_probs_train)
+    
+    # Compute train metrics
+    precision_train, recall_train, tn_train, fp_train, fn_train, tp_train, auc_roc_train, prc_auc_train = compute_metrics(y_true_train, y_pred_probs_train)
+    
+    # Validation phase
+    model.eval()
+    val_loss = 0.0
+    y_true_val = []
+    y_pred_probs_val = []
+    
+    with torch.no_grad():
+        for inputs, labels in val_loader:
+            outputs = model(inputs).squeeze()
+            loss = criterion(outputs, labels)
+            val_loss += loss.item() * inputs.size(0)
+            y_true_val.append(labels.detach().numpy())
+            y_pred_probs_val.append(outputs.detach().numpy())
+    
+    val_loss /= len(val_loader.dataset)
+    y_true_val = np.concatenate(y_true_val)
+    y_pred_probs_val = np.concatenate(y_pred_probs_val)
+    
+    # Compute validation metrics
+    precision_val, recall_val, tn_val, fp_val, fn_val, tp_val, auc_roc_val, prc_auc_val = compute_metrics(y_true_val, y_pred_probs_val)
+    
+    # Print metrics
+    print(f"Epoch [{epoch+1}/{num_epochs}]")
+    print(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+    print(f"Train Precision: {precision_train:.4f}, Recall: {recall_train:.4f}, TP: {tp_train}, FP: {fp_train}, TN: {tn_train}, FN: {fn_train}, AUC-ROC: {auc_roc_train:.4f}, PRC-AUC: {prc_auc_train:.4f}")
+    print(f"Val Precision: {precision_val:.4f}, Recall: {recall_val:.4f}, TP: {tp_val}, FP: {fp_val}, TN: {tn_val}, FN: {fn_val}, AUC-ROC: {auc_roc_val:.4f}, PRC-AUC: {prc_auc_val:.4f}")
+
