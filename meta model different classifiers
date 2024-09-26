@@ -3,6 +3,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
+from sklearn.svm import SVC
 from sklearn.metrics import precision_score, recall_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 
@@ -38,12 +39,14 @@ def train_models(non_fraud_data, fraud_data):
     # Split into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Define models with class_weight for LogisticRegression and RandomForest, and imbalance handling for XGBoost and LightGBM
+    # Define models with class_weight for LogisticRegression, RandomForest, and SVC
+    # XGBoost and LightGBM use scale_pos_weight for handling imbalance
     models = {
         "Logistic Regression": LogisticRegression(class_weight='balanced'),
         "Random Forest": RandomForestClassifier(class_weight='balanced', random_state=42),
         "XGBoost": XGBClassifier(scale_pos_weight=len(non_fraud_labels) / len(fraud_labels), random_state=42),
-        "LightGBM": LGBMClassifier(scale_pos_weight=len(non_fraud_labels) / len(fraud_labels), random_state=42)
+        "LightGBM": LGBMClassifier(scale_pos_weight=len(non_fraud_labels) / len(fraud_labels), random_state=42),
+        "SVC": SVC(class_weight='balanced', probability=True, random_state=42)  # Adding SVC
     }
 
     # Train and evaluate each model
