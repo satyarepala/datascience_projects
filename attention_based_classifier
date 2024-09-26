@@ -152,3 +152,36 @@ for epoch in range(num_epochs):
     print(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
     print(f"Train Precision: {precision_train:.4f}, Recall: {recall_train:.4f}, TP: {tp_train}, FP: {fp_train}, TN: {tn_train}, FN: {fn_train}, AUC-ROC: {auc_roc_train:.4f}, PRC-AUC: {prc_auc_train:.4f}")
     print(f"Val Precision: {precision_val:.4f}, Recall: {recall_val:.4f}, TP: {tp_val}, FP: {fp_val}, TN: {tn_val}, FN: {fn_val}, AUC-ROC: {auc_roc_val:.4f}, PRC-AUC: {prc_auc_val:.4f}")
+
+
+import torch
+import torch.nn as nn
+
+# Simple NN classifier with CrossEntropyLoss
+class SimpleNNClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(SimpleNNClassifier, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, output_size)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.1)
+    
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x  # No softmax for CrossEntropyLoss
+
+# Model parameters
+input_size = 500  # Size of the input feature vector
+hidden_size = 128  # Number of hidden units
+output_size = 2  # Binary classification (2 logits for 2 classes)
+
+# Initialize the model
+model = SimpleNNClassifier(input_size, hidden_size, output_size)
+
+# Example usage with random data
+input_data = torch.randn(16, input_size)  # Batch size of 16
+output = model(input_data)
+print(output)
