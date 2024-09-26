@@ -267,3 +267,7 @@ for epoch in range(num_epochs):
 
 if early_stop:
     print("Training stopped early due to lack of improvement.")
+
+
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5)
+
