@@ -185,3 +185,85 @@ model = SimpleNNClassifier(input_size, hidden_size, output_size)
 input_data = torch.randn(16, input_size)  # Batch size of 16
 output = model(input_data)
 print(output)
+
+
+# Early stopping parameters
+patience = 10
+best_val_loss = float('inf')
+epochs_no_improve = 0
+early_stop = False
+
+# Training loop
+num_epochs = 100  # Set this high enough, early stopping will handle termination
+for epoch in range(num_epochs):
+    model.train()
+    train_loss = 0.0
+    y_true_train = []
+    y_pred_probs_train = []
+    
+    for inputs, labels in train_loader:
+        optimizer.zero_grad()
+        outputs = model(inputs)  # Logits from the model
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        
+        train_loss += loss.item() * inputs.size(0)
+        
+        # For metrics, get predictions as probabilities using softmax
+        y_pred_probs = torch.softmax(outputs, dim=1)[:, 1].detach().numpy()
+        y_true_train.append(labels.detach().numpy())
+        y_pred_probs_train.append(y_pred_probs)
+    
+    train_loss /= len(train_loader.dataset)
+    y_true_train = np.concatenate(y_true_train)
+    y_pred_probs_train = np.concatenate(y_pred_probs_train)
+    
+    # Compute train metrics
+    precision_train, recall_train, tn_train, fp_train, fn_train, tp_train, auc_roc_train, prc_auc_train = compute_metrics(y_true_train, y_pred_probs_train)
+    
+    # Validation phase
+    model.eval()
+    val_loss = 0.0
+    y_true_val = []
+    y_pred_probs_val = []
+    
+    with torch.no_grad():
+        for inputs, labels in val_loader:
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            val_loss += loss.item() * inputs.size(0)
+            
+            y_pred_probs = torch.softmax(outputs, dim=1)[:, 1].detach().numpy()
+            y_true_val.append(labels.detach().numpy())
+            y_pred_probs_val.append(y_pred_probs)
+    
+    val_loss /= len(val_loader.dataset)
+    y_true_val = np.concatenate(y_true_val)
+    y_pred_probs_val = np.concatenate(y_pred_probs_val)
+    
+    # Compute validation metrics
+    precision_val, recall_val, tn_val, fp_val, fn_val, tp_val, auc_roc_val, prc_auc_val = compute_metrics(y_true_val, y_pred_probs_val)
+    
+    # Print metrics
+    print(f"Epoch [{epoch+1}/{num_epochs}]")
+    print(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+    print(f"Train Precision: {precision_train:.4f}, Recall: {recall_train:.4f}, TP: {tp_train}, FP: {fp_train}, TN: {tn_train}, FN: {fn_train}, AUC-ROC: {auc_roc_train:.4f}, PRC-AUC: {prc_auc_train:.4f}")
+    print(f"Val Precision: {precision_val:.4f}, Recall: {recall_val:.4f}, TP: {tp_val}, FP: {fp_val}, TN: {tn_val}, FN: {fn_val}, AUC-ROC: {auc_roc_val:.4f}, PRC-AUC: {prc_auc_val:.4f}")
+    
+    # Early stopping logic
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        epochs_no_improve = 0
+        # Optionally save the model checkpoint when validation loss improves
+        torch.save(model.state_dict(), 'best_model.pt')
+    else:
+        epochs_no_improve += 1
+    
+    if epochs_no_improve == patience:
+        print(f"Early stopping at epoch {epoch+1}. Best validation loss: {best_val_loss:.4f}")
+        early_stop = True
+        break
+
+if early_stop:
+    print("Training stopped early due to lack of improvement.")
