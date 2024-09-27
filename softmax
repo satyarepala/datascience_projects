@@ -1,16 +1,29 @@
 import numpy as np
 
-# Example logits from a multiclass classifier (shape: [n_samples, n_classes])
-logits = np.array([[2.0, 1.0, 0.1],
-                   [1.0, 3.0, 0.2]])
+# Example logits of shape (12, 2) for 12 samples and 2 classes (binary classification)
+logits = np.array([
+    [1.0, 2.0],
+    [2.5, 0.5],
+    [0.5, -1.0],
+    [3.0, 2.0],
+    [0.0, 1.0],
+    [1.5, 1.5],
+    [0.0, -0.5],
+    [1.0, 0.5],
+    [2.0, 3.0],
+    [1.0, -1.0],
+    [-0.5, -1.0],
+    [2.0, 2.0]
+])
 
-# Apply the Softmax function to each set of logits
+# Softmax function to apply to logits
 def softmax(logits):
-    exp_logits = np.exp(logits - np.max(logits, axis=1, keepdims=True))  # For numerical stability
+    exp_logits = np.exp(logits - np.max(logits, axis=1, keepdims=True))  # Numerical stability trick
     return exp_logits / np.sum(exp_logits, axis=1, keepdims=True)
 
-# Get class probabilities
+# Apply softmax to get probabilities for each class (shape: 12 x 2)
 probabilities = softmax(logits)
 
-# Print the probabilities
-print("Probabilities:", probabilities)
+# Print the probabilities for each sample
+print("Probabilities for each class:")
+print(probabilities)
