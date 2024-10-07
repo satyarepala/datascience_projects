@@ -36,19 +36,38 @@ train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size,
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-# LSTM Binary Classifier
+import torch.nn.init as init
+
 class LSTMClassifier(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers):
         super(LSTMClassifier, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, 1)
-    
+        
+        # Apply weight initialization
+        self._initialize_weights()
+
     def forward(self, x):
         h0 = torch.zeros(num_layers, x.size(0), hidden_size).to(x.device)
         c0 = torch.zeros(num_layers, x.size(0), hidden_size).to(x.device)
         out, _ = self.lstm(x, (h0, c0))
         out = self.fc(out[:, -1, :])  # Get the output of the last timestep
         return out
+    
+    def _initialize_weights(self):
+        # Initialize LSTM weights
+        for name, param in self.lstm.named_parameters():
+            if 'weight_ih' in name:  # input-hidden weights
+                init.xavier_uniform_(param.data)
+            elif 'weight_hh' in name:  # hidden-hidden weights
+                init.orthogonal_(param.data)
+            elif 'bias' in name:  # biases
+                param.data.fill_(0)
+                
+        # Initialize fully connected layer weights
+        init.xavier_uniform_(self.fc.weight)
+        self.fc.bias.data.fill_(0)
+
 
 # Initialize model, loss function, and optimizer
 input_size = 10
