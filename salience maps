@@ -1,0 +1,14 @@
+# Input tensor (batch_size, seq_len, input_size)
+x = torch.randn(1, 100, 10, requires_grad=True)  # Example single sequence
+
+# Forward pass
+output = model(x)
+
+# Backpropagation
+output[0].backward()
+
+# Saliency map is the gradient of the input
+saliency = x.grad.abs().squeeze()
+
+# Output the saliency map for visualization
+print("Saliency map shape:", saliency.shape)  # Should be (seq_len, input_size)
