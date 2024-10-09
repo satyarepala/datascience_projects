@@ -1,0 +1,61 @@
+import torch
+import torch.nn as nn
+import torch.nn.init as init
+
+class MultiHeadAttentionClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size, num_heads, num_layers):
+        super(MultiHeadAttentionClassifier, self).__init__()
+        
+        # Multihead Attention Layer
+        self.multihead_attention = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads, batch_first=True)
+        
+        # Linear layers to project input to hidden size and for final classification
+        self.input_projection = nn.Linear(input_size, hidden_size)
+        self.fc = nn.Linear(hidden_size, 1)
+        
+        # Apply weight initialization
+        self._initialize_weights()
+
+    def forward(self, x):
+        # Project the input features to match hidden size
+        x = self.input_projection(x)  # (batch_size, seq_len, hidden_size)
+        
+        # Prepare for multihead attention (query, key, value are the same in self-attention)
+        attn_output, attn_weights = self.multihead_attention(x, x, x)  # Self-attention mechanism
+        
+        # Take the mean of the attention output across the sequence (global average pooling)
+        out = attn_output.mean(dim=1)  # (batch_size, hidden_size)
+        
+        # Pass through the fully connected layer for binary classification
+        out = self.fc(out)  # (batch_size, 1)
+        return out
+
+    def _initialize_weights(self):
+        # Initialize Multihead Attention weights
+        for name, param in self.multihead_attention.named_parameters():
+            if 'weight' in name:
+                init.xavier_uniform_(param.data)
+            elif 'bias' in name:
+                param.data.fill_(0)
+        
+        # Initialize fully connected layers weights
+        init.xavier_uniform_(self.input_projection.weight)
+        self.input_projection.bias.data.fill_(0)
+        init.xavier_uniform_(self.fc.weight)
+        self.fc.bias.data.fill_(0)
+
+
+# Initialize model, loss function, and optimizer
+input_size = 10  # Number of input features per timestep
+hidden_size = 64  # Dimension of hidden states in attention
+num_heads = 4  # Number of attention heads
+num_layers = 2  # Not used in this example (only 1 attention layer here)
+
+model = MultiHeadAttentionClassifier(input_size, hidden_size, num_heads, num_layers)
+
+# Create random input tensor (batch_size, seq_len, input_size)
+X_test = torch.randn(64, 100, 10)
+
+ # Set model to evaluation mode
+logits = model(X_test) 
+logits.shape
