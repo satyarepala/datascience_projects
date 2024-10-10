@@ -1,0 +1,77 @@
+Detecting Account Takeover Fraud: A Comprehensive Approach with Sample Data
+In the battle against account takeover (ATO) fraud, we are developing a robust detection model that combines user online activity, device information, and domain-specific features. This holistic approach aims to accurately flag suspicious activities that may indicate fraudulent attempts. Here, we present a breakdown of the key inputs used, along with sample data for each category.
+
+1. User Online Activity: We track various activities that users perform on their brokerage or financial accounts, such as logins, transactions, and security-related events. Each action generates critical behavioral data that helps detect anomalies.
+Sample Online activity Data:
+{
+    "user_id": "U12345",
+    "activity": [
+        {"type": "login", "timestamp": "2024-10-10T09:00:00Z", "status": "success"},
+        {"type": "transaction", "amount": 5000, "timestamp": "2024-10-10T09:15:00Z"},
+        {"type": "security_token_activation", "timestamp": "2024-10-10T10:00:00Z"},
+        {"type": "password_reset", "timestamp": "2024-10-10T11:00:00Z"},
+        {"type": "login", "timestamp": "2024-10-10T11:30:00Z", "status": "failure"},
+        {"type": "order_placement", "amount": 20000, "timestamp": "2024-10-10T12:00:00Z"}
+    ]
+}
+
+In this example, the user is performing high-value transactions, triggering security token activation, and facing failed logins—all of which are tracked to determine patterns indicative of fraudulent behavior.
+
+2. User Device Information: We collect data from the user agent, which includes the type of device and browser the user is operating. This information is critical for detecting suspicious device characteristics, such as the use of emulators or outdated software versions often associated with fraudulent activities.
+Sample User Agent Data:
+{
+    "user_id": "U12345",
+    "device_info": {
+        "device_type": "Desktop",
+        "browser": "Chrome",
+        "browser_version": "112.0.5615.137",
+        "os": "Windows 10",
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.137 Safari/537.36"
+    }
+}
+
+By analyzing such data, our model can detect unusual patterns, like when a user switches from a recognized device to an emulator or an older, less secure operating system, which could suggest fraudulent activity.
+
+3. Domain Features (Recency and Frequency): Our model also calculates the recency and frequency of specific activities, offering valuable temporal insights. For example, if a user has multiple failed login attempts or performs a high number of transactions within a short period, these could be warning signs.
+Sample Data for Recency and Frequency:
+{
+    "user_id": "U12345",
+    "activity_frequency": {
+        "login_failures": {
+            "1_day": 5,
+            "3_days": 10,
+            "1_week": 15
+        },
+        "transactions": {
+            "1_day": 3,
+            "3_days": 7,
+            "1_week": 10
+        }
+    }
+}
+
+
+For instance, a user who has 5 login failures in a single day, 10 in three days, and 15 in a week might exhibit behavior typical of an account takeover attempt. Such high-frequency actions can be used as strong indicators of fraud, particularly when aligned with other suspicious behaviors.
+
+Data Integration and Model Training: We integrate all the above data inputs—user activity, device information, and domain-specific features—into our model for training. The model learns from labeled data, distinguishing between legitimate and fraudulent activities. By continuously refining the model with new data and emerging fraud tactics, we aim to minimize false positives while enhancing fraud detection capabilities.
+Sample Combined Data for Model Training:
+{
+    "user_id": "U12345",
+    "online_activity": {
+        "login_attempts": 2,
+        "transactions": 2,
+        "login_failures": 1,
+        "password_reset": 1
+    },
+    "device_info": {
+        "device_type": "Desktop",
+        "os": "Windows 10",
+        "browser": "Chrome"
+    },
+    "recency_frequency": {
+        "login_failures": {"1_day": 5, "1_week": 15},
+        "transactions": {"1_day": 3, "1_week": 10}
+    },
+    "label": "fraud"  // Fraud label assigned for supervised learning
+}
+
