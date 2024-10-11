@@ -1,0 +1,118 @@
+import torch
+from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import train_test_split
+
+class PaddedSequenceDataset(Dataset):
+    def __init__(self, X, Y, lengths):
+        """
+        X: Padded sequences (tensor or list of tensors)
+        Y: Labels corresponding to sequences
+        lengths: Actual lengths of the sequences
+        """
+        self.X = X  # Padded sequences
+        self.Y = Y  # Labels
+        self.lengths = lengths  # Actual sequence lengths
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Y[idx], self.lengths[idx]
+
+def custom_collate_fn(batch):
+    """
+    Custom collate function that returns batch data for padded sequences
+    """
+    batch_X, batch_Y, batch_lengths = zip(*batch)
+    batch_X = torch.stack(batch_X)  # Stack into a tensor
+    batch_Y = torch.tensor(batch_Y)  # Convert labels to tensor
+    batch_lengths = torch.tensor(batch_lengths)  # Convert lengths to tensor
+    return batch_X, batch_Y, batch_lengths
+
+
+# Example data
+X = torch.randn(1000, 50, 10)  # 1000 sequences, each of length 50 with 10 features
+Y = torch.randint(0, 2, (1000,))  # Labels (binary classification)
+lengths = torch.randint(1, 51, (1000,))  # Random lengths between 1 and 50
+
+# Split the data into train and validation sets (stratified by labels)
+X_train, X_val, Y_train, Y_val, lengths_train, lengths_val = train_test_split(
+    X, Y, lengths, test_size=0.2, stratify=Y, random_state=42
+)
+
+# Create train and validation datasets
+train_dataset = PaddedSequenceDataset(X_train, Y_train, lengths_train)
+val_dataset = PaddedSequenceDataset(X_val, Y_val, lengths_val)
+
+# Create train and validation data loaders
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_fn)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, collate_fn=custom_collate_fn)
+
+# Example: Iterate over a batch in train_loader
+for batch_X, batch_Y, batch_lengths in train_loader:
+    print(f"Batch X shape: {batch_X.shape}")  # Should be [batch_size, 50, 10]
+    print(f"Batch Y: {batch_Y}")  # Labels for the batch
+    print(f"Batch lengths: {batch_lengths}")  # Actual sequence lengths
+    break
+
+import torch
+import torch.nn as nn
+import torch.nn.init as init
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+class LSTMClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(LSTMClassifier, self).__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, 1)
+        
+        # Apply weight initialization
+        self._initialize_weights()
+
+    def forward(self, x, lengths):
+        # Initialize hidden state and cell state
+        h0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
+        c0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
+        
+        # Pack the padded sequences before passing to LSTM
+        packed_input = pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+
+        # Pass the packed sequences to the LSTM
+        packed_output, (hn, cn) = self.lstm(packed_input, (h0, c0))
+        
+        # Unpack the output if needed
+        # output, _ = pad_packed_sequence(packed_output, batch_first=True)
+        
+        # Pass the last hidden state (hn[-1]) to the fully connected layer for classification
+        out = self.fc(hn[-1])  # Use the last hidden state from the final layer of LSTM
+        
+        return out
+    
+    def _initialize_weights(self):
+        # Initialize LSTM weights
+        for name, param in self.lstm.named_parameters():
+            if 'weight_ih' in name:  # input-hidden weights
+                init.xavier_uniform_(param.data)
+            elif 'weight_hh' in name:  # hidden-hidden weights
+                init.orthogonal_(param.data)
+            elif 'bias' in name:  # biases
+                param.data.fill_(0)
+                
+        # Initialize fully connected layer weights
+        init.xavier_uniform_(self.fc.weight)
+        self.fc.bias.data.fill_(0)
+
+
+# Example input data processing before passing to the model
+# Assuming your data loader gives you padded sequences and the lengths of the non-padded sequences
+x = torch.randn(32, 50, 10)  # Batch of 32, each with 50 time steps and 10 features
+lengths = torch.randint(1, 50, (32,))  # Random lengths for sequences (1 to 50)
+
+# Create the model and test forward pass
+input_size = 10
+hidden_size = 64
+num_layers = 2
+model = LSTMClassifier(input_size, hidden_size, num_layers)
+
+output = model(x, lengths)
+print(output.shape)  # Output shape should be (batch_size, 1)
