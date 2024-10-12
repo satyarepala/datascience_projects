@@ -1,0 +1,56 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.nn.utils.rnn as rnn_utils
+
+class LSTMWithAttention(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(LSTMWithAttention, self).__init__()
+        # Update input_size to the new number of features per timestep
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.attention = Attention(hidden_size)  # No change needed here
+        self.fc = nn.Linear(hidden_size, 1)  # Binary classification
+
+    def forward(self, x, lengths):
+        # Initialize hidden state and cell state
+        h0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
+        c0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
+
+        # Pack the padded sequence
+        packed_input = rnn_utils.pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        
+        # Pass through LSTM
+        packed_output, (hn, cn) = self.lstm(packed_input, (h0, c0))
+
+        # Unpack sequence
+        lstm_output, _ = rnn_utils.pad_packed_sequence(packed_output, batch_first=True)
+
+        # Apply attention
+        context, attn_weights = self.attention(lstm_output, lengths)
+
+        # Classification
+        out = self.fc(context)
+        return out, attn_weights
+
+class Attention(nn.Module):
+    def __init__(self, hidden_size):
+        super(Attention, self).__init__()
+        self.attn = nn.Linear(hidden_size, 1)
+
+    def forward(self, lstm_output, lengths):
+        # lstm_output is [batch_size, seq_len, hidden_size]
+        max_len = lstm_output.size(1)
+        mask = torch.arange(max_len).expand(len(lengths), max_len).to(lstm_output.device)
+        mask = mask >= lengths.unsqueeze(1)
+        
+        # Compute attention scores
+        attn_scores = self.attn(lstm_output).squeeze(-1)  # Shape: [batch_size, seq_len]
+        attn_scores.masked_fill_(mask, float('-inf'))  # Mask padded positions
+        
+        # Apply softmax to get attention weights
+        attn_weights = F.softmax(attn_scores, dim=1)  # Shape: [batch_size, seq_len]
+        
+        # Apply the attention weights to the lstm output
+        context = torch.bmm(attn_weights.unsqueeze(1), lstm_output).squeeze(1)  # Weighted sum
+        
+        return context, attn_weights
