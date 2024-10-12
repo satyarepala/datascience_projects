@@ -6,10 +6,15 @@ import torch.nn.utils.rnn as rnn_utils
 class LSTMWithAttention(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers):
         super(LSTMWithAttention, self).__init__()
-        # Update input_size to the new number of features per timestep
+        # Define LSTM layer
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.attention = Attention(hidden_size)  # No change needed here
+        # Define attention mechanism
+        self.attention = Attention(hidden_size)
+        # Define fully connected layer
         self.fc = nn.Linear(hidden_size, 1)  # Binary classification
+
+        # Apply weight initialization
+        self._initialize_weights()
 
     def forward(self, x, lengths):
         # Initialize hidden state and cell state
@@ -31,6 +36,20 @@ class LSTMWithAttention(nn.Module):
         # Classification
         out = self.fc(context)
         return out, attn_weights
+
+    def _initialize_weights(self):
+        # Initialize LSTM weights
+        for name, param in self.lstm.named_parameters():
+            if 'weight_ih' in name:  # input-hidden weights
+                nn.init.xavier_uniform_(param.data)
+            elif 'weight_hh' in name:  # hidden-hidden weights
+                nn.init.orthogonal_(param.data)
+            elif 'bias' in name:  # biases
+                param.data.fill_(0)
+        
+        # Initialize fully connected layer weights
+        nn.init.xavier_uniform_(self.fc.weight)
+        self.fc.bias.data.fill_(0)
 
 class Attention(nn.Module):
     def __init__(self, hidden_size):
@@ -54,3 +73,27 @@ class Attention(nn.Module):
         context = torch.bmm(attn_weights.unsqueeze(1), lstm_output).squeeze(1)  # Weighted sum
         
         return context, attn_weights
+
+# Define input dimensions and hyperparameters
+input_size = 20     # Number of features per timestep (new feature size)
+hidden_size = 64    # Hidden size for LSTM
+num_layers = 2      # Number of LSTM layers
+
+# Initialize the model
+model = LSTMWithAttention(input_size, hidden_size, num_layers).to('cuda')
+
+# Test the model with sample input of batch size 32, each sequence having 50 timesteps
+batch_size = 32
+seq_len = 50
+features = input_size
+
+# Create sample data: sequences of shape (32, 50, 20), actual lengths, and padded sequences
+x_sample = torch.randn(batch_size, seq_len, features).to('cuda')
+lengths_sample = torch.randint(low=1, high=seq_len, size=(batch_size,), dtype=torch.long).to('cuda')
+
+# Forward pass through the model
+output, attn_weights = model(x_sample, lengths_sample)
+
+# Output shapes
+print(f"Output shape: {output.shape}")            # Expected: [batch_size, 1]
+print(f"Attention shape: {attn_weights.shape}")   # Expected: [batch_size, seq_len]
