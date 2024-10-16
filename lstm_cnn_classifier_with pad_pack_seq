@@ -3,83 +3,59 @@ import torch.nn as nn
 import torch.nn.init as init
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-class CNNLSTMClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, cnn_out_channels, kernel_size, pool_size):
-        super(CNNLSTMClassifier, self).__init__()
+class LSTMClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(LSTMClassifier, self).__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, 1)
         
-        # 1D Convolutional Layer
-        self.conv1d = nn.Conv1d(in_channels=input_size, out_channels=cnn_out_channels, kernel_size=kernel_size, padding=kernel_size // 2)
-        self.pool = nn.MaxPool1d(pool_size)
-        
-        # LSTM Layer
-        self.lstm = nn.LSTM(cnn_out_channels, hidden_size, num_layers, batch_first=True)
-        
-        # Fully connected layer
-        self.fc = nn.Linear(hidden_size, 1)  # Binary classification (1 output)
-
         # Apply weight initialization
         self._initialize_weights()
 
     def forward(self, x, lengths):
-        # x has shape [batch_size, seq_len, input_size]
-        
-        # Permute x to [batch_size, input_size, seq_len] for Conv1d
-        x = x.permute(0, 2, 1)
-        
-        # Pass through Conv1d and pooling layers
-        x = self.conv1d(x)
-        x = self.pool(x)
-        
-        # Permute back to [batch_size, seq_len, cnn_out_channels] for LSTM
-        x = x.permute(0, 2, 1)
-        
         # Initialize hidden state and cell state
         h0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
         c0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
-
+        
         # Pack the padded sequences before passing to LSTM
         packed_input = pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
-        
+
         # Pass the packed sequences to the LSTM
         packed_output, (hn, cn) = self.lstm(packed_input, (h0, c0))
         
-        # Use the last hidden state (hn[-1]) for classification
-        out = self.fc(hn[-1])  # hn[-1] gives the last hidden state for each sequence
+        # Unpack the output if needed
+        # output, _ = pad_packed_sequence(packed_output, batch_first=True)
+        
+        # Pass the last hidden state (hn[-1]) to the fully connected layer for classification
+        out = self.fc(hn[-1])  # Use the last hidden state from the final layer of LSTM
         
         return out
-
+    
     def _initialize_weights(self):
-        # Initialize Conv1d weights
-        nn.init.xavier_uniform_(self.conv1d.weight)
-        self.conv1d.bias.data.fill_(0)
-        
         # Initialize LSTM weights
         for name, param in self.lstm.named_parameters():
             if 'weight_ih' in name:  # input-hidden weights
-                nn.init.xavier_uniform_(param.data)
+                init.xavier_uniform_(param.data)
             elif 'weight_hh' in name:  # hidden-hidden weights
-                nn.init.orthogonal_(param.data)
+                init.orthogonal_(param.data)
             elif 'bias' in name:  # biases
                 param.data.fill_(0)
                 
         # Initialize fully connected layer weights
-        nn.init.xavier_uniform_(self.fc.weight)
+        init.xavier_uniform_(self.fc.weight)
         self.fc.bias.data.fill_(0)
 
-# Test with a sample input of batch size 32
-x = torch.randn(32, 50, 10)  # Batch of 32, each with 50 time steps and 10 features
-lengths = torch.randint(1, 50, (32,))  # Random lengths for sequences (1 to 50)
 
-input_size = 10
+# Example input data processing before passing to the model
+# Assuming your data loader gives you padded sequences and the lengths of the non-padded sequences
+x = torch.randn(32, 100, 57)  # Batch of 32, each with 100 time steps and 57 features
+lengths = torch.randint(1, 100, (32,))  # Random lengths for sequences (1 to 100)
+
+# Create the model and test forward pass
+input_size = 57
 hidden_size = 64
 num_layers = 2
-cnn_out_channels = 32  # Number of filters in Conv1d
-kernel_size = 3
-pool_size = 2
+model = LSTMClassifier(input_size, hidden_size, num_layers)
 
-# Create the model
-model = CNNLSTMClassifier(input_size, hidden_size, num_layers, cnn_out_channels, kernel_size, pool_size)
-
-# Forward pass
 output = model(x, lengths)
 print(output.shape)  # Output shape should be (batch_size, 1)
