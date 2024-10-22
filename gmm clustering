@@ -1,0 +1,30 @@
+import numpy as np
+from sklearn.mixture import GaussianMixture
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+
+# Assuming embeddings is a numpy array of shape (5000, 64)
+embeddings = np.random.rand(5000, 64)  # Replace this with your actual embeddings
+
+# Define the number of clusters
+n_clusters = 5  # You can adjust the number of clusters based on your use case
+
+# Create a Gaussian Mixture Model
+gmm = GaussianMixture(n_components=n_clusters, random_state=42)
+
+# Fit the GMM model and predict the cluster labels
+gmm.fit(embeddings)
+labels = gmm.predict(embeddings)
+
+# Perform PCA for dimensionality reduction to 2 components for visualization
+pca = PCA(n_components=2)
+embeddings_2d = pca.fit_transform(embeddings)
+
+# Plot the clustered embeddings in 2D space
+plt.figure(figsize=(8, 6))
+plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], c=labels, cmap='viridis', s=10)
+plt.title(f'GMM Clustering Visualization with {n_clusters} Clusters')
+plt.xlabel('PCA Component 1')
+plt.ylabel('PCA Component 2')
+plt.colorbar(label='Cluster Label')
+plt.show()
