@@ -1,0 +1,24 @@
+import pandas as pd
+
+# Example embedding generation function
+def generate_embedding(text):
+    # Dummy embedding function, replace with actual embedding generation code
+    return [len(text)] * 1536  # Replace with actual embeddings, e.g., model.encode(text)
+
+# Sample DataFrame
+data = {
+    'mail': ['example1@example.com', 'example2@example.com'],
+    'address': ['123 Main St', '456 Maple Ave'],
+    'name': ['Alice', 'Bob']
+}
+df = pd.DataFrame(data)
+
+# List of columns for which to generate embeddings
+columns_to_embed = ['mail', 'address']
+
+# Generate embeddings and add new columns with '_emb' suffix
+for col in columns_to_embed:
+    df[f"{col}_emb"] = df[col].apply(generate_embedding)
+
+# Display the resulting DataFrame
+print(df)
