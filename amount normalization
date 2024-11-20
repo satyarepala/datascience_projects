@@ -1,0 +1,32 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when, floor
+
+# Initialize Spark session
+spark = SparkSession.builder.appName("Transaction Amount Transformation").getOrCreate()
+
+# Sample data
+data = [
+    (10,),
+    (100,),
+    (500,),
+    (1500,),
+    (50000,),
+    (1000000,),
+    (12000000,)
+]
+columns = ["transaction_amount"]
+
+# Create DataFrame
+df = spark.createDataFrame(data, columns)
+
+# Add boolean columns and normalize amounts
+df = df.withColumn("in_hundreds", when((col("transaction_amount") >= 100) & (col("transaction_amount") < 1000), True).otherwise(False)) \
+       .withColumn("in_thousands", when((col("transaction_amount") >= 1000) & (col("transaction_amount") < 1000000), True).otherwise(False)) \
+       .withColumn("in_millions", when(col("transaction_amount") >= 1000000, True).otherwise(False)) \
+       .withColumn("base_value", when(col("transaction_amount") < 100, col("transaction_amount"))
+                                .when((col("transaction_amount") >= 100) & (col("transaction_amount") < 1000), col("transaction_amount") / 100)
+                                .when((col("transaction_amount") >= 1000) & (col("transaction_amount") < 1000000), col("transaction_amount") / 1000)
+                                .when(col("transaction_amount") >= 1000000, col("transaction_amount") / 1000000)))
+
+# Show the result
+df.show()
