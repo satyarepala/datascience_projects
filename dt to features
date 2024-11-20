@@ -1,0 +1,36 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, hour, dayofweek, dayofmonth, when
+
+# Initialize Spark session
+spark = SparkSession.builder.appName("Datetime Transformation").getOrCreate()
+
+# Sample data
+data = [
+    ("2024-11-20 06:30:00",),
+    ("2024-11-20 13:45:00",),
+    ("2024-11-20 18:15:00",),
+    ("2024-11-20 23:10:00",),
+    ("2024-11-20 02:50:00",)
+]
+columns = ["dt"]
+
+# Create DataFrame
+df = spark.createDataFrame(data, columns)
+
+# Add extracted columns and encode part of day
+df = df.withColumn("hour", hour(col("dt"))) \
+       .withColumn("part_of_day", when((col("hour") >= 0) & (col("hour") < 6), "midnight")
+                                    .when((col("hour") >= 6) & (col("hour") < 12), "morning")
+                                    .when((col("hour") >= 12) & (col("hour") < 17), "afternoon")
+                                    .when((col("hour") >= 17) & (col("hour") < 21), "evening")
+                                    .otherwise("night")) \
+       .withColumn("part_of_day_encoded", when(col("part_of_day") == "midnight", 0)
+                                         .when(col("part_of_day") == "morning", 1)
+                                         .when(col("part_of_day") == "afternoon", 2)
+                                         .when(col("part_of_day") == "evening", 3)
+                                         .otherwise(4)) \
+       .withColumn("day_of_week", dayofweek(col("dt"))) \
+       .withColumn("day_of_month", dayofmonth(col("dt")))
+
+# Show the result
+df.show(truncate=False)
