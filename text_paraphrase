@@ -1,8 +1,1 @@
-I reviewed the issue related to detecting rectangular boxes for barcode and address locations during the treasury check process. This challenge is common with contour/blob-based approaches and cannot be resolved with 100% accuracy due to noise in the images and the non-intelligent nature of the system.
-
-Proposed Solution:
-We can introduce a feature in the User Interface (UI) that allows users to manually adjust the detected boxes after the initial identification step. This human-in-the-loop feedback can benefit us in two ways:
-
-Achieving 100% performance and more accurate predictions.
-Using user-adjusted boxes to train and improve future models.
-Let me know your thoughts on this approach.
+text
