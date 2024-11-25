@@ -1,0 +1,15 @@
+# Adam optimizer
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+# To change optimizer, uncomment the desired optimizer
+# SGD with momentum
+# optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+
+# RMSprop
+# optimizer = optim.RMSprop(model.parameters(), lr=learning_rate)
+
+# AdamW
+# optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
+
+# Adagrad
+# optimizer = optim.Adagrad(model.parameters(), lr=learning_rate)
