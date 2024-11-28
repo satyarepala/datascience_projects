@@ -1,0 +1,80 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.nn import MultiheadAttention
+
+class AttentionClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, num_heads):
+        super(AttentionClassifier, self).__init__()
+        
+        # Initialize fully connected layers for classification
+        self.fc = nn.Linear(hidden_size, 1)  # Assuming binary classification (output 1 or 0)
+        
+        # Multi-Head Attention layer
+        self.attn = MultiheadAttention(embed_dim=input_size, num_heads=num_heads, batch_first=True)
+        
+        # Positional Encoding (optional, you can use this if you want to add positional encodings)
+        self.position_embedding = nn.Embedding(100, input_size)  # Assuming 100 time steps as the max
+        
+    def forward(self, x, lengths):
+        """
+        :param x: Input sequence of shape (batch_size, seq_len, input_size)
+        :param lengths: Sequence lengths of each input in the batch
+        """
+        # Apply positional encoding
+        position = torch.arange(0, x.size(1), device=x.device).unsqueeze(0)
+        position_embedding = self.position_embedding(position)
+        
+        # Add positional encoding to the input sequence
+        x = x + position_embedding
+
+        # Create attention mask to ignore padding (padding value will be 0)
+        # The mask has a shape of (batch_size, seq_len), where padded values are False (0)
+        # and valid values are True (1)
+        attn_mask = self._generate_attention_mask(lengths, x.size(1), x.device)
+        
+        # Attention mechanism: x is the input sequence, and we get attention_output and attention_weights
+        attn_output, attn_weights = self.attn(x, x, x, attn_mask=attn_mask)  # Self-attention (query, key, value are all x)
+        
+        # Optionally, apply dropout after attention
+        # attn_output = F.dropout(attn_output, p=0.1, training=self.training)
+        
+        # You can pool the attention outputs here (mean, max, etc.)
+        # For simplicity, using the output of the last time step as the representation
+        attn_output = attn_output[:, -1, :]
+        
+        # Classification layer (fully connected)
+        output = self.fc(attn_output)
+        
+        return output
+
+    def _generate_attention_mask(self, lengths, max_len, device):
+        """
+        Generates a mask for padding based on sequence lengths
+        :param lengths: List of sequence lengths for each batch item
+        :param max_len: Maximum sequence length in the batch
+        :param device: Device to put the tensor on
+        :return: Attention mask tensor of shape (batch_size, seq_len)
+        """
+        mask = torch.arange(max_len, device=device).unsqueeze(0) < lengths.unsqueeze(1)
+        return mask
+
+# Example usage:
+input_size = 57  # Number of features at each time step
+hidden_size = 64  # Hidden size for attention output
+num_layers = 1  # Number of attention layers
+num_heads = 4  # Number of attention heads
+
+# Initialize the model
+model = AttentionClassifier(input_size, hidden_size, num_layers, num_heads)
+
+# Example input data (batch_size=32, seq_len=100, input_size=57)
+x = torch.randn(32, 100, input_size)
+
+# Sequence lengths for each item in the batch
+lengths = torch.randint(1, 100, (32,))  # Random sequence lengths between 1 and 100
+
+# Forward pass
+output = model(x, lengths)
+
+print(output.shape)  # Expected output: (32, 1) for binary classification
