@@ -1,0 +1,45 @@
+import numpy as np
+import pandas as pd
+
+def one_hot_encode_column(matrix, column_index, unique_values):
+    """
+    One-hot encodes a specific column of a matrix using a list of unique values.
+    
+    Parameters:
+        matrix (numpy.ndarray): Input matrix of shape (100, n).
+        column_index (int): Index of the column to be one-hot encoded.
+        unique_values (list): List of unique values for one-hot encoding.
+    
+    Returns:
+        numpy.ndarray: Matrix with the selected column replaced by its one-hot encoding.
+    """
+    # Extract the column to be one-hot encoded
+    column_to_encode = matrix[:, column_index]
+    
+    # Create a DataFrame for easier one-hot encoding
+    df = pd.DataFrame(matrix)
+    
+    # Perform one-hot encoding on the specified column using unique values
+    one_hot_df = pd.get_dummies(column_to_encode, prefix=f"col_{column_index}", drop_first=False)
+    one_hot_df = one_hot_df.reindex(columns=[f"col_{column_index}_{val}" for val in unique_values], fill_value=0)
+    
+    # Remove the original column and concatenate the one-hot encoded columns
+    df.drop(columns=[column_index], axis=1, inplace=True)
+    result = pd.concat([df, one_hot_df], axis=1)
+    
+    # Convert back to a NumPy array
+    return result.to_numpy()
+
+# Example Usage
+# Original matrix (100x10) with random data
+np.random.seed(42)
+matrix = np.random.randint(0, 5, size=(100, 10))  # Random integers between 0 and 4
+
+# List of unique values for column 0
+unique_values_col1 = [0, 1, 2, 3, 4]
+
+# One-hot encode column 0
+result_matrix = one_hot_encode_column(matrix, column_index=0, unique_values=unique_values_col1)
+
+print("Original Matrix Shape:", matrix.shape)
+print("Transformed Matrix Shape:", result_matrix.shape)
