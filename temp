@@ -1,0 +1,13 @@
+Here is the rewritten version of the text in a more professional and clear manner:
+
+
+---
+
+I am still working on understanding why the model flagged these user IDs, as it is a neural network model, and we need to interpret its predictions.
+
+Upon manually reviewing user IDs I noticed that their activities include interactions with call centers, which are commonly associated with ATO (Account Takeover) fraud. Although these users may not have directly initiated fraudulent transactions, their overall activity patterns exhibit underlying signals similar to those observed in previous ATO fraud cases.
+
+I will continue to investigate further to provide more detailed insights.
+
+
+
