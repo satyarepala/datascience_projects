@@ -1,0 +1,68 @@
+import torch
+import torch.nn as nn
+import torch.nn.init as init
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+class LSTMClassifierWithAttention(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(LSTMClassifierWithAttention, self).__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.attention = nn.Linear(hidden_size, 1)  # Attention layer
+        self.fc = nn.Linear(hidden_size, 1)  # Fully connected layer for classification
+        
+        # Apply weight initialization
+        self._initialize_weights()
+
+    def forward(self, x, lengths):
+        # Initialize hidden state and cell state
+        h0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
+        c0 = torch.zeros(self.lstm.num_layers, x.size(0), self.lstm.hidden_size).to(x.device)
+
+        # Pack the padded sequences before passing to LSTM
+        packed_input = pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+
+        # Pass the packed sequences to the LSTM
+        packed_output, (hn, cn) = self.lstm(packed_input, (h0, c0))
+
+        # Unpack the output if needed
+        output, _ = pad_packed_sequence(packed_output, batch_first=True)
+
+        # Apply attention mechanism
+        attention_weights = torch.softmax(self.attention(output), dim=1)  # (batch_size, seq_len, 1)
+        context_vector = torch.sum(attention_weights * output, dim=1)  # (batch_size, hidden_size)
+
+        # Pass the context vector to the fully connected layer for classification
+        out = self.fc(context_vector)
+
+        return out
+
+    def _initialize_weights(self):
+        # Initialize LSTM weights
+        for name, param in self.lstm.named_parameters():
+            if 'weight_ih' in name:  # Input-hidden weights
+                init.xavier_uniform_(param.data)
+            elif 'weight_hh' in name:  # Hidden-hidden weights
+                init.orthogonal_(param.data)
+            elif 'bias' in name:  # Biases
+                param.data.fill_(0)
+        
+        # Initialize attention layer weights
+        init.xavier_uniform_(self.attention.weight)
+        self.attention.bias.data.fill_(0)
+        
+        # Initialize fully connected layer weights
+        init.xavier_uniform_(self.fc.weight)
+        self.fc.bias.data.fill_(0)
+
+# Example input data processing before passing to the model
+x = torch.randn(32, 100, 57)  # Batch of 32, each with 100 time steps and 57 features
+lengths = torch.randint(1, 100, (32,))  # Random lengths for sequences (1 to 100)
+
+# Create the model and test forward pass
+input_size = 57
+hidden_size = 64
+num_layers = 2
+model = LSTMClassifierWithAttention(input_size, hidden_size, num_layers)
+
+output = model(x, lengths)
+print("Output shape:", output.shape)  # Expected shape: (batch_size, 1)
