@@ -1,0 +1,3 @@
+A KS statistic of 0.64 indicates that the model has strong discriminatory power in distinguishing between the two classes, with a significant separation between the cumulative distributions of the predicted probabilities for "bad" cases (e.g., ACH deposits that will return) and "good" cases (deposits that will not return). This value suggests that the model is highly effective in assigning higher probabilities to bad cases compared to good cases, resulting in a clear differentiation. With a KS value well above the commonly accepted threshold of 0.3 for good models, this performance reflects the model's robustness and reliability in identifying patterns that separate the two outcomes
+
+
