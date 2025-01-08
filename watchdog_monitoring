@@ -1,0 +1,51 @@
+import os
+import subprocess
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+class MyHandler(FileSystemEventHandler):
+    def on_modified(self, event):
+        # Trigger when a file or folder is modified
+        if event.is_directory:
+            print(f"Directory modified: {event.src_path}")
+        else:
+            print(f"File modified: {event.src_path}")
+            self.run_script()
+
+    def on_created(self, event):
+        # Trigger when a new file or folder is created
+        if event.is_directory:
+            print(f"Directory created: {event.src_path}")
+        else:
+            print(f"File created: {event.src_path}")
+            self.run_script()
+
+    def on_deleted(self, event):
+        # Trigger when a file or folder is deleted
+        if event.is_directory:
+            print(f"Directory deleted: {event.src_path}")
+        else:
+            print(f"File deleted: {event.src_path}")
+            self.run_script()
+
+    def run_script(self):
+        # Specify the script you want to run
+        script_path = "/path/to/your_script.py"
+        print("Running script...")
+        subprocess.run(["python3", script_path])
+
+if __name__ == "__main__":
+    folder_to_watch = "/path/to/folder"  # Replace with the folder you want to monitor
+    event_handler = MyHandler()
+    observer = Observer()
+    observer.schedule(event_handler, folder_to_watch, recursive=True)
+
+    try:
+        print(f"Monitoring changes in: {folder_to_watch}")
+        observer.start()
+        while True:
+            pass  # Keep the script running
+    except KeyboardInterrupt:
+        print("\nStopping observer...")
+        observer.stop()
+    observer.join()
