@@ -113,10 +113,23 @@ def overlay_attention_on_dataframe_with_values(df, attention_weights, sequence_i
     # Create a mask of attention values for overlaying
     overlay = np.outer(attn_normalized, np.ones(df.shape[1]))  # Shape: (seq_len, num_features)
 
+    # Ensure annotations are strings
+    annotations = df.astype(str).values
+
     # Plot the DataFrame with attention overlay
     plt.figure(figsize=(24, 16))
-    sns.heatmap(overlay, cmap="Reds", alpha=0.5, cbar=True, xticklabels=df.columns, yticklabels=df.index, annot=df.values,
-                fmt=".2f", annot_kws={"size": 8, "color": "black"}, linewidths=0.5)
+    sns.heatmap(
+        overlay,
+        cmap="Reds",
+        alpha=0.5,
+        cbar=True,
+        xticklabels=df.columns,
+        yticklabels=df.index,
+        annot=annotations,  # Use string annotations
+        fmt="",  # Avoid formatting issues
+        annot_kws={"size": 8, "color": "black"},
+        linewidths=0.5,
+    )
     plt.title(f"Input Features with Attention Overlay (Layer {layer_index + 1})", fontsize=16)
     plt.xlabel("Features", fontsize=14)
     plt.ylabel("Time Steps", fontsize=14)
@@ -125,9 +138,10 @@ def overlay_attention_on_dataframe_with_values(df, attention_weights, sequence_i
 
 # Generate a sample Pandas DataFrame (100 rows, 32 columns)
 np.random.seed(42)
-sample_df = pd.DataFrame(np.random.randn(100, 32), columns=[f"Feature_{i+1}" for i in range(32)])
-
-
+sample_df = pd.DataFrame(
+    np.random.choice([42, "hello", "world", np.random.randn()], size=(100, 32)),
+    columns=[f"Feature_{i+1}" for i in range(32)],
+)
 
 # Overlay attention weights on the DataFrame for the first sequence and first layer
 overlay_attention_on_dataframe_with_values(sample_df, attention_weights, sequence_index=0, layer_index=0)
