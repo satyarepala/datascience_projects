@@ -88,9 +88,46 @@ with torch.no_grad():
     outputs, attention_weights = model(sample_input, lengths)
 outputs
 
-# Visualize Attention Weights (if available)
-#if attention_weights:
-sample_attention = attention_weights[0].cpu().numpy()  # Shape: (num_heads, seq_len, seq_len)
-sns.heatmap(sample_attention.mean(axis=0), cmap="viridis")  # Average across heads
-plt.title("Attention Weights")
-plt.show()
+def overlay_attention_on_dataframe_with_values(df, attention_weights, sequence_index, layer_index=0):
+    """
+    Visualizes a Pandas DataFrame with feature values as text and overlays attention weights as a heatmap.
+
+    Parameters:
+        df (pd.DataFrame): Input DataFrame (rows: time steps, cols: features).
+        attention_weights (list): List of attention weights from all layers.
+        sequence_index (int): Index of the sequence in the batch to visualize.
+        layer_index (int): Layer index to extract attention weights from.
+    """
+    # Extract attention weights for the specific layer
+    attn = attention_weights[layer_index].detach().cpu().numpy()  # Shape: (num_heads, seq_len, seq_len)
+
+    # Get the attention weights for the specific sequence
+    attn_for_sequence = attn[:, sequence_index, :]  # Shape: (num_heads, seq_len)
+
+    # Average across the heads
+    attn_mean = attn_for_sequence.mean(axis=0)  # Shape: (seq_len,)
+
+    # Normalize the attention weights to range [0, 1]
+    attn_normalized = (attn_mean - attn_mean.min()) / (attn_mean.max() - attn_mean.min())
+
+    # Create a mask of attention values for overlaying
+    overlay = np.outer(attn_normalized, np.ones(df.shape[1]))  # Shape: (seq_len, num_features)
+
+    # Plot the DataFrame with attention overlay
+    plt.figure(figsize=(24, 16))
+    sns.heatmap(overlay, cmap="Reds", alpha=0.5, cbar=True, xticklabels=df.columns, yticklabels=df.index, annot=df.values,
+                fmt=".2f", annot_kws={"size": 8, "color": "black"}, linewidths=0.5)
+    plt.title(f"Input Features with Attention Overlay (Layer {layer_index + 1})", fontsize=16)
+    plt.xlabel("Features", fontsize=14)
+    plt.ylabel("Time Steps", fontsize=14)
+    plt.show()
+
+
+# Generate a sample Pandas DataFrame (100 rows, 32 columns)
+np.random.seed(42)
+sample_df = pd.DataFrame(np.random.randn(100, 32), columns=[f"Feature_{i+1}" for i in range(32)])
+
+
+
+# Overlay attention weights on the DataFrame for the first sequence and first layer
+overlay_attention_on_dataframe_with_values(sample_df, attention_weights, sequence_index=0, layer_index=0)
