@@ -1,0 +1,96 @@
+import torch
+import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import matplotlib.pyplot as plt
+import seaborn as sns
+import shap
+from captum.attr import IntegratedGradients
+import numpy as np
+
+# Define a custom TransformerEncoderLayer to capture attention weights
+class CustomTransformerEncoderLayer(nn.TransformerEncoderLayer):
+    def __init__(self, *args, **kwargs):
+        super(CustomTransformerEncoderLayer, self).__init__(*args, **kwargs)
+        self.attention_weights = None
+
+    def forward(self, src, *args, **kwargs):
+        src2, attn_weights = self.self_attn(src, src, src, need_weights=True)
+        self.attention_weights = attn_weights  # Save attention weights
+        src = src + self.dropout1(src2)
+        src = self.norm1(src)
+        src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
+        src = src + self.dropout2(src2)
+        src = self.norm2(src)
+        return src
+
+# Update the TimeSeriesTransformer class
+class TimeSeriesTransformer(nn.Module):
+    def __init__(self, input_dim, model_dim, num_heads, num_layers, dropout=0.1):
+        super(TimeSeriesTransformer, self).__init__()
+
+        self.embedding = nn.Linear(input_dim, model_dim)
+
+        self.encoder_layers = nn.ModuleList([
+            CustomTransformerEncoderLayer(
+                d_model=model_dim,
+                nhead=num_heads,
+                dim_feedforward=model_dim * 4,
+                dropout=dropout
+            ) for _ in range(num_layers)
+        ])
+
+        self.fc = nn.Linear(model_dim, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x, lengths):
+        x = self.embedding(x)
+
+        # Pack the sequence
+        packed_input = pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+
+        # Unpack the packed input to pass through encoder layers
+        unpacked_input, _ = pad_packed_sequence(packed_input, batch_first=False)
+
+        # Process through encoder layers and collect attention weights
+        attention_weights = []
+        encoded_output = unpacked_input
+
+        for layer in self.encoder_layers:
+            encoded_output = layer(encoded_output)
+            attention_weights.append(layer.attention_weights)  # Save attention weights
+
+        # Repack the encoded output
+        packed_output = pack_padded_sequence(encoded_output, lengths, batch_first=False, enforce_sorted=False)
+        unpacked_output, _ = pad_packed_sequence(packed_output, batch_first=True)
+
+        # Extract the outputs corresponding to the last valid time step for each sequence
+        output = torch.stack([unpacked_output[i, l-1] for i, l in enumerate(lengths)], dim=0)
+        output = self.fc(output)
+
+        return self.sigmoid(output), attention_weights
+
+# Initialize the model
+input_dim = 32
+model_dim = 64
+num_heads = 4
+num_layers = 2
+model = TimeSeriesTransformer(input_dim, model_dim, num_heads, num_layers)
+
+# Create a sample input for testing
+batch_size = 3
+seq_len = 100
+sample_input = torch.randn(batch_size, seq_len, input_dim)
+lengths = torch.tensor([100, 80, 60])  # Example lengths for each sequence in the batch
+
+# Test the model
+model.eval()
+with torch.no_grad():
+    outputs, attention_weights = model(sample_input, lengths)
+outputs
+
+# Visualize Attention Weights (if available)
+#if attention_weights:
+sample_attention = attention_weights[0].cpu().numpy()  # Shape: (num_heads, seq_len, seq_len)
+sns.heatmap(sample_attention.mean(axis=0), cmap="viridis")  # Average across heads
+plt.title("Attention Weights")
+plt.show()
