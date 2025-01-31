@@ -1,0 +1,127 @@
+import pickle
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import udf, col
+from pyspark.sql.types import ArrayType, IntegerType
+
+def get_unique_values_dict(df: DataFrame, columns: list):
+    """
+    Creates a dictionary with unique values for each specified column.
+
+    Args:
+    df (DataFrame): PySpark DataFrame.
+    columns (list): List of column names to extract unique values from.
+
+    Returns:
+    unique_values_dict (dict): Dictionary where keys are column names, values are lists of unique values.
+    """
+    unique_values_dict = {}
+    for column in columns:
+        unique_values = df.select(column).distinct().rdd.flatMap(lambda x: x).collect()
+        unique_values_dict[column] = sorted(unique_values)  # Sort for consistent ordering
+    return unique_values_dict
+
+def create_one_hot_dict(unique_values):
+    """
+    Creates a dictionary mapping each unique category to a one-hot encoded list.
+
+    Args:
+    unique_values (list): List of unique values in the column.
+
+    Returns:
+    encoding_dict (dict): Dictionary mapping categories to one-hot encoded lists.
+    """
+    encoding_dict = {val: [1 if i == idx else 0 for i in range(len(unique_values))] 
+                     for idx, val in enumerate(unique_values)}
+    return encoding_dict
+
+def one_hot_encode_column(df: DataFrame, column: str, unique_values: list):
+    """
+    One-hot encodes a given column in the PySpark DataFrame using a dictionary-based UDF.
+
+    Args:
+    df (DataFrame): Input PySpark DataFrame.
+    column (str): Column to be one-hot encoded.
+    unique_values (list): List of unique values for the column.
+
+    Returns:
+    df (DataFrame): Updated DataFrame with a new one-hot encoded column.
+    encoding_dict (dict): Mapping of category to one-hot encoding.
+    """
+    # Create one-hot encoding dictionary
+    encoding_dict = create_one_hot_dict(unique_values)
+
+    # Define UDF for transformation
+    def one_hot_udf(value):
+        return encoding_dict.get(value, [0] * len(unique_values))
+
+    # Convert function to UDF
+    udf_one_hot = udf(one_hot_udf, ArrayType(IntegerType()))
+
+    # Apply UDF and create new column
+    df = df.withColumn(f"{column}_enc", udf_one_hot(col(column)))
+
+    return df, encoding_dict
+
+def one_hot_encode_multiple_columns(df: DataFrame, columns: list, save_path: str):
+    """
+    Automatically extracts unique values, one-hot encodes multiple columns, and saves the encoding dictionary.
+
+    Args:
+    df (DataFrame): Input PySpark DataFrame.
+    columns (list): List of column names to be one-hot encoded.
+    save_path (str): Path to save the encoding dictionary as a pickle file.
+
+    Returns:
+    df (DataFrame): Updated DataFrame with new one-hot encoded columns.
+    encoding_dicts (dict): Dictionary storing encoding mappings for each column.
+    """
+    # Get unique values for all specified columns
+    unique_values_dict = get_unique_values_dict(df, columns)
+
+    encoding_dicts = {}
+    for col_name in columns:
+        df, encoding_dict = one_hot_encode_column(df, col_name, unique_values_dict[col_name])
+        encoding_dicts[col_name] = encoding_dict
+
+    # Save encoding dictionary as a pickle file
+    with open(save_path, "wb") as f:
+        pickle.dump(encoding_dicts, f)
+
+    return df, encoding_dicts
+
+
+
+from pyspark.sql import SparkSession
+
+# Initialize Spark Session
+spark = SparkSession.builder.appName("OneHotEncoding").getOrCreate()
+
+# Sample DataFrame
+data = [("red", "apple"), ("blue", "banana"), ("red", "banana"), ("green", "apple")]
+columns = ["color", "fruit"]
+df = spark.createDataFrame(data, columns)
+
+# Save path for pickle file
+pickle_save_path = "encoding_dict.pkl"
+
+# Apply One-Hot Encoding (No Need to Pass Unique Values)
+df_encoded, encoding_dicts = one_hot_encode_multiple_columns(df, ["color", "fruit"], pickle_save_path)
+
+# Show Results
+df_encoded.show(truncate=False)
+
+# Print Encoding Dictionaries
+print("Encoding Dictionary:", encoding_dicts)
+
+
+with open("encoding_dict.pkl", "rb") as f:
+    loaded_dict = pickle.load(f)
+
+print("Loaded Encoding Dictionary:", loaded_dict)
+
+
+
+
+
+
+
