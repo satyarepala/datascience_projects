@@ -1,0 +1,69 @@
+import pickle
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import udf, col
+from pyspark.sql.types import ArrayType, IntegerType
+
+def load_encoding_dict(dict_path: str):
+    """
+    Loads the encoding dictionary from a pickle file.
+
+    Args:
+    dict_path (str): Path to the pickle file containing the encoding dictionary.
+
+    Returns:
+    encoding_dicts (dict): Dictionary storing encoding mappings for each column.
+    """
+    with open(dict_path, "rb") as f:
+        encoding_dicts = pickle.load(f)
+    return encoding_dicts
+
+def one_hot_encode_using_dict(df: DataFrame, columns: list, dict_path: str):
+    """
+    Applies one-hot encoding to the specified columns using a preloaded dictionary.
+
+    Args:
+    df (DataFrame): Input PySpark DataFrame.
+    columns (list): List of column names to be one-hot encoded.
+    dict_path (str): Path to the saved encoding dictionary (pickle file).
+
+    Returns:
+    df (DataFrame): Updated DataFrame with new one-hot encoded columns.
+    """
+    # Load the saved encoding dictionary
+    encoding_dicts = load_encoding_dict(dict_path)
+
+    for column in columns:
+        if column not in encoding_dicts:
+            raise ValueError(f"Column '{column}' not found in the encoding dictionary.")
+
+        encoding_dict = encoding_dicts[column]  # Get encoding for the column
+
+        # Define UDF for encoding transformation
+        def one_hot_udf(value):
+            return encoding_dict.get(value, [0] * len(encoding_dict))
+
+        # Convert function to UDF
+        udf_one_hot = udf(one_hot_udf, ArrayType(IntegerType()))
+
+        # Apply UDF and create new column
+        df = df.withColumn(f"{column}_enc", udf_one_hot(col(column)))
+
+    return df
+
+
+from pyspark.sql import SparkSession
+
+# Initialize Spark Session
+spark = SparkSession.builder.appName("OneHotEncodingApply").getOrCreate()
+
+# Sample DataFrame
+data = [("red", "apple"), ("blue", "banana"), ("green", "apple"), ("yellow", "grape")]
+columns = ["color", "fruit"]
+df = spark.createDataFrame(data, columns)
+
+# Load & Apply One-Hot Encoding from Pickle File
+dict_path = "encoding_dict.pkl"  # Path to the saved dictionary
+df_encoded = one_hot_encode_using_dict(df, ["color", "fruit"], dict_path)
+
+# Show Results
+df_encoded.show(truncate=False)
