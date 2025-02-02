@@ -1,0 +1,8 @@
+
+
+*"We understand that the face comparison model is proprietary; however, for documentation purposes, we request some high-level technical details. Specifically, could you confirm the type of deep learning model employed, such as a Convolutional Neural Network (CNN), a fully connected network, or any other architecture? Additionally, we would appreciate clarification on the network design—whether it follows a Siamese architecture, triplet network, or another framework—and the type of loss function utilized (e.g., contrastive loss, triplet loss, cross-entropy).
+
+Furthermore, without disclosing sensitive architectural specifics, a general overview of the model structure—such as the number of layers, key components (e.g., convolutional blocks, dense layers), and activation functions—would be helpful."*
+
+This version is more precise and provides specific examples to guide the response. Let me know if you'd like further adjustments.
+
