@@ -4,5 +4,13 @@
 
 Furthermore, without disclosing sensitive architectural specifics, a general overview of the model structure—such as the number of layers, key components (e.g., convolutional blocks, dense layers), and activation functions—would be helpful."*
 
-This version is more precise and provides specific examples to guide the response. Let me know if you'd like further adjustments.
+
+
+*"Could you provide details on the multi-layered anti-spoofing mechanisms implemented in the model? Specifically, we would like to understand the types of liveness detection techniques used—whether they are active (e.g., blink detection, head movement) or passive (e.g., texture analysis, reflection detection).
+
+Additionally, it would be helpful if you could share examples of the specific methods or technologies applied at different layers of the anti-spoofing framework to enhance security."*
+
+This version is concise, professional, and clearly guides the vendor to provide relevant details with examples. Let me know if you'd like to tweak it further.
+
+
 
