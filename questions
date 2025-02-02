@@ -10,7 +10,7 @@ Furthermore, without disclosing sensitive architectural specifics, a general ove
 
 Additionally, it would be helpful if you could share examples of the specific methods or technologies applied at different layers of the anti-spoofing framework to enhance security."*
 
-This version is concise, professional, and clearly guides the vendor to provide relevant details with examples. Let me know if you'd like to tweak it further.
 
 
+"Could you clarify whether both use cases—face matching and liveness detection—are being addressed using the same model or if separate models are employed for each objective? If a single model is used, does it generate separate scores for face matching and liveness detection, or is a combined score provided to represent both functionalities?"
 
