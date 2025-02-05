@@ -15,3 +15,34 @@ shap.summary_plot(shap_values[0], sequence_input.detach().numpy(), plot_type="he
 
 # Attribution for length vector
 print("SHAP Values for Length Vector:", shap_values[1])
+
+
+
+import torch
+from captum.attr import IntegratedGradients
+import matplotlib.pyplot as plt
+
+# Dummy example input
+sequence_input = torch.randn(1, 300, 79, requires_grad=True)  # Batch size 1
+length_vector = torch.randint(1, 300, (1, 1), requires_grad=True)  # Example length vector
+
+# Assuming your model takes two inputs: sequence_input and length_vector
+model.eval()
+
+# Integrated Gradients
+ig = IntegratedGradients(model)
+
+# Apply Integrated Gradients
+attributions, delta = ig.attribute(inputs=(sequence_input, length_vector), 
+                                   target=1,  # Change target as needed
+                                   return_convergence_delta=True)
+
+# Visualizing the attribution for the sequence input
+plt.figure(figsize=(10, 6))
+plt.imshow(attributions[0].squeeze().detach().numpy(), cmap='hot', interpolation='nearest')
+plt.colorbar()
+plt.title('Integrated Gradients Attribution for Sequence Input')
+plt.show()
+
+# For the length vector
+print("Attribution for Length Vector:", attributions[1].detach().numpy())
