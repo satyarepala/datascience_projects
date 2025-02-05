@@ -46,3 +46,31 @@ plt.show()
 
 # For the length vector
 print("Attribution for Length Vector:", attributions[1].detach().numpy())
+
+
+
+
+import torch
+import torch.nn.functional as F
+from captum.attr import IntegratedGradients
+
+# Wrapper model to apply sigmoid on logits
+class WrappedModel(torch.nn.Module):
+    def __init__(self, model):
+        super(WrappedModel, self).__init__()
+        self.model = model
+
+    def forward(self, x, lengths):
+        logits = self.model(x, lengths)
+        return torch.sigmoid(logits)  # Apply sigmoid for attribution
+
+# Use the wrapped model for explainability
+wrapped_model = WrappedModel(model)
+ig = IntegratedGradients(wrapped_model)
+
+# Compute attributions
+attributions, delta = ig.attribute(
+    inputs=(sequence_input, length_vector),
+    target=0,  # For binary classification, sigmoid outputs a single value
+    return_convergence_delta=True
+)
