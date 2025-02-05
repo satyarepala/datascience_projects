@@ -1,4 +1,4 @@
-import shap
+jiimport shap
 
 # SHAP requires background data
 background_sequence = torch.randn(10, 300, 79)  # Example background data
@@ -74,3 +74,15 @@ attributions, delta = ig.attribute(
     target=0,  # For binary classification, sigmoid outputs a single value
     return_convergence_delta=True
 )
+
+# Flatten the attributions for easier processing
+attributions_flat = attributions.squeeze(0).detach().numpy().flatten()
+
+# Apply Z-Score normalization
+mean_attr = np.mean(attributions_flat)
+std_attr = np.std(attributions_flat)
+
+normalized_attributions = (attributions_flat - mean_attr) / std_attr
+
+# Reshape back if needed
+normalized_attributions = normalized_attributions.reshape(attributions.shape[1], attributions.shape[2])
