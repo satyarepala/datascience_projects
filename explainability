@@ -1,0 +1,17 @@
+import shap
+
+# SHAP requires background data
+background_sequence = torch.randn(10, 300, 79)  # Example background data
+background_length = torch.randint(1, 300, (10, 1))
+
+# Define SHAP DeepExplainer
+explainer = shap.DeepExplainer(model, [background_sequence, background_length])
+
+# Get SHAP values
+shap_values = explainer.shap_values([sequence_input, length_vector])
+
+# Visualization for sequence input
+shap.summary_plot(shap_values[0], sequence_input.detach().numpy(), plot_type="heatmap")
+
+# Attribution for length vector
+print("SHAP Values for Length Vector:", shap_values[1])
