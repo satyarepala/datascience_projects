@@ -1,0 +1,40 @@
+import pandas as pd
+import numpy as np
+
+# Sample DataFrame
+df = pd.DataFrame({
+    'A': [10, 20, 30],
+    'B': [15, 25, 35],
+    'C': [12, 22, 32]
+})
+
+# Corresponding heatmap values (same shape as df)
+heatmap_values = np.array([
+    [0.8, 0.6, 0.9],
+    [0.4, 0.7, 0.5],
+    [0.3, 0.9, 0.2]
+])
+
+# Create an Excel writer object using XlsxWriter
+with pd.ExcelWriter('heatmap_output.xlsx', engine='xlsxwriter') as writer:
+    df.to_excel(writer, sheet_name='Heatmap', index=False)
+
+    # Access the workbook and worksheet objects
+    workbook = writer.book
+    worksheet = writer.sheets['Heatmap']
+
+    # Define color scale based on heatmap_values
+    (min_val, max_val) = (heatmap_values.min(), heatmap_values.max())
+
+    # Apply conditional formatting
+    worksheet.conditional_format('A2:C4', {
+        'type': '2_color_scale',  # You can also use '3_color_scale'
+        'min_value': min_val,
+        'max_value': max_val,
+        'min_type': 'num',
+        'max_type': 'num',
+        'min_color': '#FFFFFF',   # Light color for low values
+        'max_color': '#63BE7B'    # Dark green for high values
+    })
+
+print("Excel file with heatmap formatting saved as 'heatmap_output.xlsx'")
