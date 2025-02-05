@@ -23,18 +23,34 @@ with pd.ExcelWriter('heatmap_output.xlsx', engine='xlsxwriter') as writer:
     workbook = writer.book
     worksheet = writer.sheets['Heatmap']
 
-    # Define color scale based on heatmap_values
-    (min_val, max_val) = (heatmap_values.min(), heatmap_values.max())
+    # Step 1: Write heatmap values to hidden cells (let's put them in columns F-H)
+    heatmap_df = pd.DataFrame(heatmap_values, columns=['F', 'G', 'H'])
+    heatmap_df.to_excel(writer, sheet_name='Heatmap', index=False, startcol=5)  # Start writing from column F (index 5)
 
-    # Apply conditional formatting
-    worksheet.conditional_format('A2:C4', {
-        'type': '2_color_scale',  # You can also use '3_color_scale'
-        'min_value': min_val,
-        'max_value': max_val,
-        'min_type': 'num',
-        'max_type': 'num',
-        'min_color': '#FFFFFF',   # Light color for low values
-        'max_color': '#63BE7B'    # Dark green for high values
-    })
+    # Step 2: Apply conditional formatting based on heatmap values
+    min_val = heatmap_values.min()
+    max_val = heatmap_values.max()
 
-print("Excel file with heatmap formatting saved as 'heatmap_output.xlsx'")
+    # Apply conditional formatting using formulas
+    for row in range(2, 5):  # Excel rows 2 to 4
+        for col_idx, col_letter in enumerate(['A', 'B', 'C']):
+            # Reference the corresponding heatmap value in columns F-H
+            heatmap_cell = f'{chr(70 + col_idx)}{row}'  # F2, G2, H2, etc.
+            data_cell = f'{col_letter}{row}'            # A2, B2, C2, etc.
+
+            worksheet.conditional_format(data_cell, {
+                'type': '2_color_scale',
+                'min_value': min_val,
+                'max_value': max_val,
+                'min_type': 'num',
+                'max_type': 'num',
+                'min_color': '#FFFFFF',
+                'max_color': '#63BE7B',
+                'criteria': 'cellIs',
+                'value': f'={heatmap_cell}'  # Apply formatting based on heatmap value
+            })
+
+    # Step 3: Hide the heatmap columns (F-H)
+    worksheet.set_column('F:H', None, None, {'hidden': True})
+
+print("Excel file with heatmap formatting based on heatmap_values saved as 'heatmap_output.xlsx'")
