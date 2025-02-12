@@ -3,13 +3,13 @@ Sub CopyColorsOnly()
     Dim rngSource As Range, rngTarget As Range
     Dim cell As Range
 
-    ' Set your sheets (change names as needed)
-    Set wsSource = ThisWorkbook.Sheets("Sheet1") ' Source sheet with colors
-    Set wsTarget = ThisWorkbook.Sheets("Sheet2") ' Target sheet where colors will be copied
+    ' Set worksheets
+    Set wsSource = ThisWorkbook.Sheets("Data") ' Source sheet with colors
+    Set wsTarget = ThisWorkbook.Sheets("Heatmap") ' Target sheet to copy colors
 
-    ' Define the range (Adjust as per your data)
-    Set rngSource = wsSource.Range("A1:Z100") ' Adjust to match your colored range
-    Set rngTarget = wsTarget.Range("A1:Z100") ' Make sure it matches the source range size
+    ' Define the range (Adjust as needed)
+    Set rngSource = wsSource.UsedRange ' Automatically detects the used range
+    Set rngTarget = wsTarget.Range(rngSource.Address) ' Matches the source range in target sheet
 
     ' Loop through each cell and copy background color
     For Each cell In rngSource
