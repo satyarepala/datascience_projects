@@ -1,0 +1,98 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+class LSTM2DAttention(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(LSTM2DAttention, self).__init__()
+        
+        # Normalization layers
+        self.instance_norm = nn.InstanceNorm1d(input_size)
+        
+        # BiLSTM
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
+        
+        # Attention Mechanisms
+        self.attn_time = nn.Linear(hidden_size * 2, 1)  # Attention over time
+        self.attn_feature = nn.Linear(input_size, 1)  # Attention over features
+        
+        # Fully connected layer
+        self.fc = nn.Linear(hidden_size * 2, 1)  # BiLSTM output
+        
+        # Apply weight initialization
+        self._initialize_weights()
+
+    def forward(self, x, lengths):
+        """
+        x: (batch_size, timesteps, features) -> (batch, 300, 123)
+        lengths: (batch_size,) -> Actual lengths of sequences
+        """
+        batch_size, timesteps, features = x.shape
+
+        # Apply instance normalization
+        x = x.permute(0, 2, 1)  # Convert to (batch, features, timesteps) for normalization
+        x = self.instance_norm(x)  
+        x = x.permute(0, 2, 1)  # Back to (batch, timesteps, features)
+
+        # Pack padded sequences
+        packed_input = pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
+
+        # Initialize hidden and cell states
+        h0 = torch.zeros(self.lstm.num_layers * 2, batch_size, self.lstm.hidden_size).to(x.device)
+        c0 = torch.zeros(self.lstm.num_layers * 2, batch_size, self.lstm.hidden_size).to(x.device)
+
+        # Forward pass through LSTM
+        packed_output, (hn, cn) = self.lstm(packed_input, (h0, c0))
+
+        # Unpack sequence if needed
+        lstm_out, _ = pad_packed_sequence(packed_output, batch_first=True, total_length=timesteps)  # (batch, timesteps, hidden_dim*2)
+
+        # --- Attention over Time ---
+        attn_scores_time = self.attn_time(lstm_out).squeeze(-1)  # (batch, timesteps)
+        attn_weights_time = F.softmax(attn_scores_time, dim=1).unsqueeze(-1)  # (batch, timesteps, 1)
+
+        # --- Attention over Features ---
+        attn_scores_feature = self.attn_feature(x).squeeze(-1)  # (batch, timesteps)
+        attn_weights_feature = F.softmax(attn_scores_feature, dim=1).unsqueeze(-1)  # (batch, timesteps, 1)
+
+        # Apply attention weights
+        attended_output = lstm_out * attn_weights_time * attn_weights_feature  # (batch, timesteps, hidden_dim*2)
+
+        # Global pooling (sum over timesteps)
+        context_vector = attended_output.sum(dim=1)  # (batch, hidden_dim*2)
+
+        # Fully connected layer
+        out = self.fc(context_vector)
+
+        return out
+
+    def _initialize_weights(self):
+        """ Initialize LSTM and FC weights """
+        for name, param in self.lstm.named_parameters():
+            if "weight_ih" in name:  # Input to hidden weights
+                nn.init.xavier_uniform_(param.data)
+            elif "weight_hh" in name:  # Hidden to hidden weights
+                nn.init.orthogonal_(param.data)
+            elif "bias" in name:  # Bias terms
+                param.data.fill_(0)
+
+        # Initialize fully connected layer weights
+        nn.init.xavier_uniform_(self.fc.weight)
+        self.fc.bias.data.fill_(0)
+
+# Example usage
+batch_size = 32
+timesteps = 300
+features = 123
+hidden_dim = 128
+num_layers = 2
+
+model = LSTM2DAttention(input_size=features, hidden_size=hidden_dim, num_layers=num_layers)
+
+# Dummy inputs
+x = torch.randn(batch_size, timesteps, features)
+lengths = torch.randint(50, timesteps, (batch_size,))  # Random lengths between 50 and 300
+
+output = model(x, lengths)
+print(output.shape)  # Expected: (batch_size, 1)
