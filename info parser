@@ -1,1 +1,48 @@
-dafqewrahztsfb
+Primary Input to the Model
+
+The model takes the following primary inputs to perform Face Liveness Detection, Face Matching, and Forgery Detection:
+
+1. Live Face Image or Video
+
+Captured through a user’s camera during the application process.
+
+Used for liveness detection (to check if the face is real) and face matching (to compare with the ID document).
+
+
+
+2. Identity Document Image
+
+A scanned or photographed copy of an official ID (e.g., passport, driver’s license).
+
+Used for OCR-based text extraction and forgery detection (to identify tampering).
+
+
+
+3. Extracted Text Data (via OCR)
+
+Text extracted from the identity document, such as name, date of birth, document number.
+
+Compared against user-provided data for consistency.
+
+
+
+4. Metadata from Images/Videos
+
+May include information such as resolution, lighting conditions, and image compression artifacts.
+
+Used for fraud detection (e.g., detecting whether an image has been digitally altered).
+
+
+
+
+
+---
+
+Review of Inputs with Users or Candidate Group
+
+Direct User Review: The inputs (face image, document image) are usually reviewed by the user during submission. Some systems allow users to retake their image if quality issues are detected.
+
+Automated Quality Checks: The model may automatically flag low
+
+
+
