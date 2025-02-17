@@ -46,3 +46,48 @@ Automated Quality Checks: The model may automatically flag low
 
 
 
+Are Inputs Reviewed with Users or Candidate Output?
+
+The review process depends on the system's design and operational workflow. Below is an explanation of whether the inputs are reviewed with users or a candidate group before generating the final decision.
+
+1. User Review of Inputs (Before Processing)
+
+Users typically review their inputs (face image, document image) before submission.
+
+If the system detects quality issues (e.g., blurry image, poor lighting), the user may be prompted to retake the photo.
+
+However, users do not see how the model interprets their inputs internally.
+
+
+2. Review by Candidate Group (Human Review Process)
+
+In some cases, if the model flags an application as suspicious or inconclusive, a manual review team (candidate group) may inspect the input images and outputs.
+
+This happens in high-risk scenarios, such as suspected fraud or identity mismatches.
+
+The human reviewers may override or confirm the model's decision based on additional checks.
+
+
+3. User Access to Candidate Output (Final Decision)
+
+Users typically see only the final outcome (e.g., "Identity Verified" or "Verification Failed").
+
+The detailed model outputs (scores, extracted features, or intermediate decisions) are usually not shared with users.
+
+Some systems may provide error reasons (e.g., “Face does not match ID” or “Document unreadable”), but not raw model scores.
+
+
+
+---
+
+Summary for MRM Documentation
+
+User Review of Inputs: Users can verify and resubmit images if quality checks fail, but they do not review how the model interprets inputs.
+
+Candidate Group Review: If the model flags suspicious cases, human reviewers may inspect inputs and override the decision.
+
+User Access to Output: Users see only the final verification result, not detailed model scores or intermediate outputs.
+
+
+This ensures clarity on how inputs are handled and whether they are reviewed by humans. Let me know if you need any refinements!
+
