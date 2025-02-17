@@ -1,1 +1,93 @@
-dwfhdsvn sdkjvhdov
+Since Forgery Detection in your system also involves verifying identity document (ID) images, you need to account for the assumptions related to document image quality, OCR (Optical Character Recognition) accuracy, and matching with the user's face. Here's an updated list of assumptions considering this additional step:
+
+
+---
+
+Key Assumptions for Transforming Input to Output
+
+1. Input Data Assumptions
+
+The captured face image or video is of sufficient quality (adequate resolution, proper lighting, minimal occlusions).
+
+The identity document (ID) image is clear, untampered, and includes all relevant fields (photo, name, date of birth, etc.).
+
+Users submit a genuine, government-issued ID, and the system assumes the document is valid unless fraud is detected.
+
+The document is not physically or digitally altered (e.g., no photoshopped text or swapped face images).
+
+The face on the ID is clearly visible and not obscured by reflections, blurring, or document folds.
+
+
+2. Preprocessing Assumptions
+
+The system correctly detects and extracts the face region from both the selfie and the ID image.
+
+OCR (Optical Character Recognition) accurately extracts text details from the ID (name, DOB, ID number) without misinterpretation.
+
+The system assumes document templates are recognizable (e.g., trained on specific ID formats for different countries).
+
+If anti-forgery features (holograms, watermarks) are analyzed, the system assumes they are correctly detected and validated.
+
+
+3. Model-Specific Assumptions
+
+A. Face Liveness Detection Assumptions
+
+The model correctly differentiates between live users and spoofing attacks (printed photos, video replays, 3D masks).
+
+If additional sensors (e.g., infrared, depth cameras) are used, they reliably detect live faces.
+
+The system assumes users attempt authentication in good faith and do not try to deceive the model.
+
+
+B. Face Match Assumptions
+
+The model assumes the face detected in the ID is an accurate representation of the user.
+
+Face embeddings are assumed to be robust across different conditions (lighting, angles, minor aging effects).
+
+A predefined threshold is used to determine a match, assuming a balance between false accept and false reject rates.
+
+
+C. Forgery Detection Assumptions (Including ID Verification)
+
+The model assumes that fraudulent identity documents exhibit detectable patterns (e.g., digital alterations, inconsistencies).
+
+If metadata analysis is used, it assumes digital forgeries leave detectable traces (e.g., manipulated pixels, missing EXIF data).
+
+The ID image is assumed to be unaltered, and any tampering (e.g., text modification, swapped photos) can be detected.
+
+The model assumes that genuine ID documents have specific security features, and fraudsters cannot fully replicate them.
+
+
+4. Integration and Score Calculation Assumptions
+
+The three models (Liveness, Face Match, Forgery Detection) work together to produce a single validation score.
+
+The system assumes each sub-model’s score contributes meaningfully to the final decision based on predefined weights.
+
+If any model detects fraud (e.g., forgery in the ID, face mismatch, or failed liveness check), the final score is significantly lowered.
+
+The acceptance threshold is set based on business risk appetite, balancing fraud prevention with user experience.
+
+
+
+---
+
+How to Document These Assumptions in MRM?
+
+1. Describe input conditions → "The model assumes both the selfie and the ID image are clear and unaltered."
+
+
+2. Explain document verification logic → "OCR correctly extracts text, and template matching ensures ID validity."
+
+
+3. Discuss fraud detection assumptions → "Forgery detection assumes manipulated documents exhibit detectable digital artifacts."
+
+
+4. Acknowledge system limitations → "New types of ID fraud (e.g., high-quality deepfake IDs) may not always be detected."
+
+
+
+Would you like any additional considerations, such as regulatory assumptions or edge cases (e.g., damaged documents, partial occlusions)?
+
