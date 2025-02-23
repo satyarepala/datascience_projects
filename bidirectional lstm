@@ -1,0 +1,57 @@
+import torch
+import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+class LSTMClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(LSTMClassifier, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.batch_norm = nn.BatchNorm1d(input_size)
+        self.instance_norm = nn.InstanceNorm1d(input_size)
+        
+        # Define bidirectional LSTM
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
+        
+        # Fully connected layer: hidden_size * 2 due to bidirectional LSTM
+        self.fc = nn.Linear(hidden_size * 2, 1)
+        
+        # Initialize weights
+        self._initialize_weights()
+
+    def forward(self, x, lengths):
+        # Normalize input
+        x = self.batch_norm(x)
+        x = self.instance_norm(x)
+
+        # Initialize hidden state and cell state
+        h0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)  # *2 for bidirectional
+        c0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)
+
+        # Pack padded sequences before passing to LSTM
+        packed_input = pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        packed_output, (hn, cn) = self.lstm(packed_input, (h0, c0))
+
+        # Extract last hidden state from both directions
+        hn = hn.view(self.num_layers, 2, x.size(0), self.hidden_size)  # (num_layers, num_directions, batch, hidden_size)
+        hn = hn[-1]  # Take last layer's output
+        hn = torch.cat((hn[0], hn[1]), dim=1)  # Concatenate forward and backward states
+
+        # Pass to fully connected layer
+        out = self.fc(hn)
+        
+        return out
+
+    def _initialize_weights(self):
+        # Initialize LSTM weights
+        for name, param in self.lstm.named_parameters():
+            if 'weight_ih' in name:  # Input-hidden weights
+                nn.init.xavier_uniform_(param.data)
+            elif 'weight_hh' in name:  # Hidden-hidden weights
+                nn.init.orthogonal_(param.data)
+            elif 'bias' in name:  # Biases
+                param.data.fill_(0)
+
+        # Initialize fully connected layer weights
+        nn.init.xavier_uniform_(self.fc.weight)
+        self.fc.bias.data.fill_(0)
