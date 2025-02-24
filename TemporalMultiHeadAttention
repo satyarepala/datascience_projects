@@ -48,13 +48,6 @@ class TemporalMultiHeadAttention(nn.Module):
         V = self.value(x_unpacked).view(B, max_len, self.num_heads, d_k).transpose(1, 2)
 
         attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / (d_k ** 0.5)
-        decay_factors = torch.exp(-torch.linspace(0, 3, max_len).to(x.device))
-        
-        decay_mask = torch.zeros(B, max_len, max_len, device=x.device)
-        for i, length in enumerate(lengths):
-            decay_mask[i, :length, :length] = decay_factors[:length]  
-
-        attn_scores = attn_scores * decay_mask.unsqueeze(1)
         attn_weights = torch.softmax(attn_scores, dim=-1)
         attn_output = torch.matmul(attn_weights, V)
 
