@@ -1,0 +1,83 @@
+import torch
+import torch.nn as nn
+import torch.nn.init as init
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+class TemporalMultiHeadAttention(nn.Module):
+    def __init__(self, input_dim, num_heads):
+        super().__init__()
+        self.num_heads = num_heads
+        self.d_k = input_dim // num_heads  # Ensure divisibility
+
+        # Query, Key, Value transformations
+        self.query = nn.Linear(input_dim, input_dim)
+        self.key = nn.Linear(input_dim, input_dim)
+        self.value = nn.Linear(input_dim, input_dim)
+
+        self.out_proj = nn.Linear(input_dim, input_dim)
+        self.fc = nn.Linear(input_dim, 1)  # Binary classification
+
+        self.init_weights()
+
+    def init_weights(self):
+        """Initialize weights using Xavier initialization"""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    init.zeros_(m.bias)
+
+    def forward(self, x, lengths):
+        """
+        x: Tensor of shape (B, T, F)  --> Variable-length sequence input
+        lengths: Tensor of actual lengths for each sequence in batch
+        """
+        B, T, F = x.shape  
+
+        # Pack padded sequence
+        packed_x = pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
+        x_unpacked, unpacked_lengths = pad_packed_sequence(packed_x, batch_first=True)
+
+        max_len = x_unpacked.size(1)
+        actual_feature_dim = x_unpacked.size(2)
+        assert actual_feature_dim % self.num_heads == 0, "Feature dimension must be divisible by num_heads"
+        d_k = actual_feature_dim // self.num_heads  
+
+        Q = self.query(x_unpacked).view(B, max_len, self.num_heads, d_k).transpose(1, 2)
+        K = self.key(x_unpacked).view(B, max_len, self.num_heads, d_k).transpose(1, 2)
+        V = self.value(x_unpacked).view(B, max_len, self.num_heads, d_k).transpose(1, 2)
+
+        attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / (d_k ** 0.5)
+        decay_factors = torch.exp(-torch.linspace(0, 3, max_len).to(x.device))
+        
+        decay_mask = torch.zeros(B, max_len, max_len, device=x.device)
+        for i, length in enumerate(lengths):
+            decay_mask[i, :length, :length] = decay_factors[:length]  
+
+        attn_scores = attn_scores * decay_mask.unsqueeze(1)
+        attn_weights = torch.softmax(attn_scores, dim=-1)
+        attn_output = torch.matmul(attn_weights, V)
+
+        attn_output = attn_output.transpose(1, 2).contiguous().view(B, max_len, actual_feature_dim)
+        output = self.out_proj(attn_output)
+        aggregated_output = torch.sum(output, dim=1) / lengths.view(-1, 1)
+        logits = self.fc(aggregated_output)  
+
+        return logits, attn_weights
+
+# Testing setup
+def test_model():
+    batch_size = 16  # Reduce batch size to avoid memory issues
+    max_seq_len = 100  
+    feature_dim = 123   
+    sequence_lengths = torch.randint(10, max_seq_len, (batch_size,))
+    input_data = torch.randn(batch_size, max_seq_len, feature_dim)
+    
+    num_heads = 3  
+    model = TemporalMultiHeadAttention(input_dim=feature_dim, num_heads=num_heads)
+    logits, attention_weights = model(input_data, sequence_lengths)
+    
+    print("Logits shape:", logits.shape)
+    print("Attention Weights shape:", attention_weights.shape)
+
+test_model()
