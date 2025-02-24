@@ -1,0 +1,65 @@
+import torch
+import torch.nn as nn
+import torch.nn.init as init
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+class LSTMClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(LSTMClassifier, self).__init__()
+        self.batch_norm = nn.BatchNorm1d(input_size)
+        self.instance_norm = nn.InstanceNorm1d(input_size)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, 1)
+
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        """Initialize LSTM weights"""
+        for name, param in self.lstm.named_parameters():
+            if "weight_ih" in name or "weight_hh" in name:
+                init.orthogonal_(param.data)
+            elif "bias" in name:
+                param.data.fill_(0)
+
+    def forward(self, x, lengths):
+        B, T, F = x.shape
+        
+        # Apply decay factors (temporal decay)
+        decay_factors = torch.exp(-torch.linspace(0, 3, T).to(x.device))
+        x = x * decay_factors.view(1, T, 1)  # Apply decay to each feature
+        
+        # Normalize input
+        x = self.batch_norm(x.permute(0, 2, 1)).permute(0, 2, 1)
+        x = self.instance_norm(x.permute(0, 2, 1)).permute(0, 2, 1)
+        
+        # Initialize hidden and cell state
+        h0 = torch.zeros(self.lstm.num_layers, B, self.lstm.hidden_size).to(x.device)
+        c0 = torch.zeros(self.lstm.num_layers, B, self.lstm.hidden_size).to(x.device)
+
+        # Pack the padded sequences before passing to LSTM
+        packed_input = pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        packed_output, (h_n, c_n) = self.lstm(packed_input, (h0, c0))
+
+        # Unpack the output if needed
+        output, _ = pad_packed_sequence(packed_output, batch_first=True)
+
+        # Use the last hidden state (h_n[-1]) for classification
+        out = self.fc(h_n[-1])  
+        
+        return out
+
+# Test the model with a sample batch
+batch_size = 32
+sequence_length = 100  # Maximum sequence length
+feature_size = 57  # Number of features
+
+# Generate random sample data
+sample_data = torch.rand(batch_size, sequence_length, feature_size)
+sample_lengths = torch.randint(1, sequence_length + 1, (batch_size,))
+
+# Create model instance
+model = LSTMClassifier(input_size=feature_size, hidden_size=128, num_layers=2)
+
+# Forward pass
+logits = model(sample_data, sample_lengths)
+print("Logits shape:", logits.shape)  # Expected output: [32, 1]
