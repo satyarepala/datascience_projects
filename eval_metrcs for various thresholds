@@ -1,0 +1,37 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when, lit, count, sum as spark_sum
+
+# Initialize Spark Session
+spark = SparkSession.builder.appName("ThresholdMetrics").getOrCreate()
+
+# Sample Data
+data = [
+    (1, 0.9), (0, 0.8), (1, 0.7), (0, 0.6), (1, 0.4), 
+    (0, 0.3), (1, 0.2), (0, 0.1)
+]
+df = spark.createDataFrame(data, ["actual", "probability"])
+
+# Define Thresholds
+thresholds = [0.2, 0.4, 0.6, 0.8]
+
+# Compute Metrics for Each Threshold
+metrics = []
+for threshold in thresholds:
+    df_thresh = df.withColumn("predicted", when(col("probability") >= lit(threshold), 1).otherwise(0))
+    
+    # Compute TP, FP, TN, FN
+    tp = df_thresh.filter((col("predicted") == 1) & (col("actual") == 1)).count()
+    fp = df_thresh.filter((col("predicted") == 1) & (col("actual") == 0)).count()
+    tn = df_thresh.filter((col("predicted") == 0) & (col("actual") == 0)).count()
+    fn = df_thresh.filter((col("predicted") == 0) & (col("actual") == 1)).count()
+    
+    # Calculate Precision, Recall, F1 Score
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    
+    metrics.append((threshold, tp, fp, tn, fn, precision, recall, f1_score))
+
+# Convert Metrics to DataFrame and Show Results
+metrics_df = spark.createDataFrame(metrics, ["Threshold", "TP", "FP", "TN", "FN", "Precision", "Recall", "F1 Score"])
+metrics_df.show(truncate=False)
