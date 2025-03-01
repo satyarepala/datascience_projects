@@ -1,5 +1,102 @@
 
 
+Model Description Summary
+
+1. Theoretical Framework and Modeling Approach
+
+The Identity Verification (IDV) Model utilizes a combination of Artificial Intelligence and Machine Learning (AIML) techniques to detect fraudulent identity documents, assess document authenticity, and verify user identity through facial recognition. The model includes:
+
+Deep Neural Networks (DNNs) for face comparison and liveness detection (both presentation attack detection and deepfake detection).
+
+Computer Vision-based classification models to analyze identity documents and extract key details such as MRZ and barcode information.
+
+Proprietary Optical Character Recognition (OCR) for text extraction from identity documents.
+
+Ensemble models, including regression-based and tree-based techniques (e.g., XGBoost), to aggregate scores from multiple sub-models and generate a final authentication decision.
 
 
-, 
+The architecture integrates multiple vendor-driven components within a controlled environment, ensuring high accuracy and robustness in fraud detection.
+
+
+---
+
+2. Justification for Model Tiering
+
+The model has been classified as Tier 3 based on its high complexity and low materiality:
+
+High Complexity:
+
+The model uses multiple advanced AIML techniques, including deep learning, computer vision, and ensemble learning, which require significant computational resources and expertise.
+
+It integrates several sub-models for document classification, data extraction, face comparison, and liveness detection, increasing its structural complexity.
+
+The reliance on vendor-provided technology adds further complexity due to external dependencies and proprietary algorithms.
+
+
+Low Materiality:
+
+While the model plays a crucial role in fraud prevention, its decisions are not directly responsible for financial loss but rather serve as a risk control mechanism in identity verification.
+
+Final decisions (e.g., account approval) rely on additional business rules and manual reviews when necessary.
+
+The model’s impact is limited to onboarding and authentication processes, with low regulatory and financial exposure.
+
+
+
+Given this balance of high complexity and low materiality, the model is categorized as Tier 3 under the organization’s tiering framework.
+
+
+---
+
+3. Model Inputs and Outputs
+
+Inputs:
+
+Identity document images (e.g., passport, driver's license, national ID).
+
+Selfie images for face comparison.
+
+MRZ and barcode data extracted from identity documents.
+
+Other metadata related to document type and issuing country.
+
+
+Outputs:
+
+Document authenticity score (detects forgery, alterations, and tampering).
+
+Face match score (compares document portrait with live selfie).
+
+Liveness detection result (identifies presentation attacks and deepfakes).
+
+Extracted text and structured data from OCR processing.
+
+Final authentication score, aggregating results from all sub-models.
+
+
+
+These outputs are used by the business to determine whether a client passes identity verification and can proceed with onboarding.
+
+
+---
+
+4. Model Risks and Business Impact
+
+The IDV model introduces several AIML-specific risks and potential business impacts:
+
+Lack of Transparency: The model incorporates vendor-provided components, which may limit insight into algorithmic decisions and require trust in proprietary technology.
+
+Bias and Fairness Concerns: While demographic markers are not explicitly used, bias in training data could result in disparities in verification outcomes for certain groups.
+
+Adversarial Attacks and Spoofing: The model must continuously adapt to new attack techniques, such as deepfakes and sophisticated presentation attacks.
+
+Operational Challenges: As an AI-driven model, continuous updates and retraining are needed to maintain performance, requiring strong monitoring and governance.
+
+
+Despite these risks, the business impact is controlled due to manual reviews and fallback verification methods, ensuring that identity verification failures do not result in direct financial losses but rather lead to additional validation steps.
+
+
+---
+
+This version covers all requested details while maintaining clarity and structure. Let me know if you need any refinements!
+
