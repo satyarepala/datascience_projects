@@ -1,4 +1,96 @@
 
 
+Assumptions and Limitations
 
-r
+Assumptions
+
+1. High-Quality Input Data:
+
+The model assumes that uploaded identity documents and selfies are clear, well-lit, and not distorted. Poor-quality images may impact accuracy.
+
+
+
+2. Authenticity of Submitted Documents:
+
+It is assumed that clients submit valid, government-issued identification documents. The model does not independently verify document issuance with government databases.
+
+
+
+3. Liveness Detection is Effective:
+
+The model assumes that liveness detection algorithms can accurately differentiate between real users and spoofing attempts (e.g., printed photos, deepfake videos).
+
+
+
+4. Face Match Threshold is Calibrated Properly:
+
+The similarity score threshold is assumed to be set optimally to balance security and usability, minimizing false positives (wrong matches) and false negatives (incorrect rejections).
+
+
+
+5. Vendor-Provided Technology is Reliable:
+
+The model depends on third-party vendor services for document validation and facial recognition, assuming that these components are accurate and free from bias.
+
+
+
+6. Adversarial Attacks are Limited:
+
+It is assumed that fraudsters do not possess advanced capabilities (e.g., AI-generated deepfakes, adversarial ML attacks) beyond what current detection techniques can handle.
+
+
+
+
+
+---
+
+Limitations
+
+1. Dependence on Vendor Technology:
+
+The model does not have full visibility into the vendor's proprietary algorithms, limiting explainability and interpretability.
+
+If the vendor modifies its model, performance changes may occur unexpectedly.
+
+
+
+2. Bias in Model Performance:
+
+The model may exhibit demographic bias, particularly if the training data lacks diversity. Certain ethnic groups, ages, or gender categories may experience higher false rejection rates.
+
+
+
+3. Handling of Edge Cases:
+
+The model may struggle with uncommon identity documents, handwritten IDs, or documents from countries with less standardization in design.
+
+
+
+4. False Positives and False Negatives:
+
+A strict threshold may cause legitimate users to fail verification (false negatives), while a loose threshold may allow fraudsters to pass verification (false positives).
+
+Manual review is required for borderline cases, increasing operational overhead.
+
+
+
+5. Vulnerability to New Attack Techniques:
+
+Fraudsters continuously develop sophisticated identity fraud methods (e.g., AI-generated deepfake videos, adversarial examples), which may outpace the model’s detection capabilities until updates are implemented.
+
+
+
+6. User Experience Challenges:
+
+Clients may struggle with image capture requirements (e.g., poor lighting, incorrect angles), leading to failed verification and frustration.
+
+Slow processing times due to vendor API dependencies could impact real-time onboarding experiences.
+
+
+
+
+
+---
+
+These assumptions and limitations provide a realistic perspective on the model's capabilities and constraints. Let me know if you’d like any refinements!
+
