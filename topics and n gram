@@ -1,0 +1,58 @@
+import nltk
+import re
+import gensim
+import numpy as np
+from collections import Counter
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from gensim import corpora, models
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from itertools import chain
+
+nltk.download("punkt")
+nltk.download("stopwords")
+
+# Sample investigation summaries (Replace this with your actual data)
+summaries = [
+    "The security breach occurred due to weak password policies. Unauthorized access was detected.",
+    "An employee was caught leaking confidential data to a third party. The investigation revealed email communications.",
+    "The system failure was caused by a misconfigured firewall, leading to service downtime.",
+    "Financial fraud was detected in the company's accounts. Suspicious transactions were flagged by auditors."
+]
+
+# Preprocessing function
+def preprocess_text(text):
+    text = text.lower()
+    text = re.sub(r"\W", " ", text)  # Remove special characters
+    tokens = word_tokenize(text)
+    stop_words = set(stopwords.words("english"))
+    return [word for word in tokens if word not in stop_words and len(word) > 2]
+
+# Tokenize and preprocess summaries
+processed_summaries = [preprocess_text(summary) for summary in summaries]
+
+# Get n-grams (bigrams, trigrams)
+def get_ngrams(texts, n=2, top_k=10):
+    vectorizer = CountVectorizer(ngram_range=(n, n))
+    ngram_matrix = vectorizer.fit_transform([" ".join(tokens) for tokens in texts])
+    ngram_counts = np.asarray(ngram_matrix.sum(axis=0)).flatten()
+    ngram_freq = dict(zip(vectorizer.get_feature_names_out(), ngram_counts))
+    return Counter(ngram_freq).most_common(top_k)
+
+bigrams = get_ngrams(processed_summaries, n=2)
+trigrams = get_ngrams(processed_summaries, n=3)
+
+# Topic Modeling with LDA
+dictionary = corpora.Dictionary(processed_summaries)
+corpus = [dictionary.doc2bow(text) for text in processed_summaries]
+lda_model = models.LdaModel(corpus, num_topics=3, id2word=dictionary, passes=10)
+
+# Display Topics
+topics = lda_model.print_topics(num_words=5)
+
+# Print results
+print("\nTop Bigrams:", bigrams)
+print("Top Trigrams:", trigrams)
+print("\nExtracted Topics:")
+for idx, topic in topics:
+    print(f"Topic {idx}: {topic}")
