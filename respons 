@@ -1,0 +1,6 @@
+You can refine the response to align more directly with the timeline aspect of the question while maintaining the vendor’s key points:
+
+"There is no predefined schedule for retraining or calibration of the SAM model. Instead, updates are triggered based on ongoing monitoring of model performance and population shifts. Specifically, retraining occurs when performance deterioration is detected, or when there are significant changes in the available predictive data. This approach ensures that model updates are data-driven and responsive to evolving patterns rather than following a fixed calendar-based schedule."
+
+This version clearly connects model updates to the conditions that prompt them while addressing the concept of timing in a structured way.
+
