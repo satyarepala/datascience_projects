@@ -1,0 +1,29 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample DataFrame
+data = {
+    "id": ["A", "A", "A", "B", "B", "B", "C", "C", "C"],
+    "date": pd.date_range(start="2024-01-01", periods=3).tolist() * 3,
+    "sale_quantity": [10, 15, 20, 5, 10, 15, 12, 18, 25]
+}
+df = pd.DataFrame(data)
+
+# Convert date column to datetime
+df["date"] = pd.to_datetime(df["date"])
+
+# Plot
+plt.figure(figsize=(10, 6))
+sns.lineplot(data=df, x="date", y="sale_quantity", hue="id", marker="o")
+
+# Labels and title
+plt.xlabel("Date")
+plt.ylabel("Sale Quantity")
+plt.title("Sales Quantity Over Time by ID")
+plt.xticks(rotation=45)
+plt.legend(title="ID")
+plt.grid(True)
+
+# Show plot
+plt.show()
