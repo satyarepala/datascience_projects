@@ -1,0 +1,50 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, expr, percentile_approx, count
+
+# Initialize Spark Session
+spark = SparkSession.builder.appName("OutlierDetection").getOrCreate()
+
+# Sample Data
+data = [
+    ("A", "M1", 100, "2024-01"),
+    ("A", "M2", 110, "2024-01"),
+    ("A", "M3", 105, "2024-01"),
+    ("A", "M4", 500, "2024-01"),  # Outlier (High)
+    ("A", "M5", 102, "2024-01"),
+    ("A", "M6", 101, "2024-01"),
+    ("A", "M7", 95, "2024-01"),
+    ("A", "M8", 98, "2024-01"),
+    ("A", "M9", 108, "2024-01"),
+    ("A", "M10", 5000, "2024-01"),  # Outlier (High)
+    ("A", "M11", 104, "2024-01"),
+    ("A", "M12", 107, "2024-01"),
+    ("A", "M13", 106, "2024-01"),
+    ("A", "M14", 105, "2024-01"),
+    ("A", "M15", 103, "2024-01"),
+]
+
+# Create DataFrame
+df = spark.createDataFrame(data, ["cat_group_id", "material_id", "BILLING_QTY", "BILLING_DATE_NORM"])
+
+# Compute Q1 (25th percentile) and Q3 (75th percentile) per cat_group_id
+quantiles = df.groupBy("cat_group_id").agg(
+    percentile_approx("BILLING_QTY", 0.25).alias("Q1"),
+    percentile_approx("BILLING_QTY", 0.75).alias("Q3"),
+)
+
+# Compute IQR and Outlier Bounds
+quantiles = quantiles.withColumn("IQR", col("Q3") - col("Q1"))
+quantiles = quantiles.withColumn("lower_bound", col("Q1") - 1.5 * col("IQR"))
+quantiles = quantiles.withColumn("upper_bound", col("Q3") + 1.5 * col("IQR"))
+
+# Join with original DataFrame
+df_with_bounds = df.join(quantiles, "cat_group_id", "left")
+
+# Identify Outliers
+df_outliers = df_with_bounds.withColumn(
+    "is_outlier",
+    expr("CASE WHEN BILLING_QTY < lower_bound OR BILLING_QTY > upper_bound THEN 1 ELSE 0 END")
+)
+
+# Select relevant columns
+df_outliers.select("cat_group_id", "material_id", "BILLING_QTY", "BILLING_DATE_NORM", "is_outlier").show()
