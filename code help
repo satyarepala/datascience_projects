@@ -1,37 +1,46 @@
-from pyspark.sql import SparkSession, functions as F
+from snowflake.snowpark import Session
+from snowflake.snowpark.functions import col, when, lit, percentile_cont
 
-# Initialize Spark Session
-spark = SparkSession.builder.appName("OutlierDetection").getOrCreate()
+# Initialize Snowflake session
+session = Session.builder.configs({...}).create()  # Replace {...} with your Snowflake configs
 
 # Sample DataFrame
-forecast_sales_sdf = spark.createDataFrame([
+forecast_sales_sdf = session.create_dataframe([
     ("A", 101, 5), ("A", 102, 7), ("A", 103, 6), ("A", 104, 8), ("A", 105, 10),
     ("A", 106, 400), ("A", 107, 450), ("B", 201, 3), ("B", 202, 4), ("B", 203, 5),
     ("B", 204, 6), ("B", 205, 7), ("B", 206, 300), ("B", 207, 320)
-], ["cat_group_id", "material_id", "BILLING_QTY"])
+], schema=["cat_group_id", "material_id", "BILLING_QTY"])
 
-# Compute Q1, Q3 for each 'cat_group_id' using approxQuantile
-quantiles = forecast_sales_sdf.groupBy("cat_group_id").agg(
-    F.expr("approxQuantile(BILLING_QTY, array(0.25, 0.75), 0) as quantiles")
+# Compute Q1 and Q3 per cat_group_id using percentile_cont
+quantiles = (
+    forecast_sales_sdf
+    .group_by("cat_group_id")
+    .agg(
+        percentile_cont(0.25).within_group("BILLING_QTY").alias("Q1"),
+        percentile_cont(0.75).within_group("BILLING_QTY").alias("Q3")
+    )
 )
 
-# Extract Q1 and Q3
-quantiles = quantiles.withColumn("Q1", F.col("quantiles")[0]) \
-                     .withColumn("Q3", F.col("quantiles")[1]) \
-                     .drop("quantiles")
-
 # Compute IQR and Outlier Bounds
-quantiles = quantiles.withColumn("IQR", F.col("Q3") - F.col("Q1")) \
-                     .withColumn("lower_bound", F.col("Q1") - 1.5 * F.col("IQR")) \
-                     .withColumn("upper_bound", F.col("Q3") + 1.5 * F.col("IQR"))
+quantiles = (
+    quantiles
+    .with_column("IQR", col("Q3") - col("Q1"))
+    .with_column("lower_bound", col("Q1") - 1.5 * col("IQR"))
+    .with_column("upper_bound", col("Q3") + 1.5 * col("IQR"))
+)
 
-# Join with original DataFrame
+# Join with the original DataFrame
 forecast_sales_sdf = forecast_sales_sdf.join(quantiles, "cat_group_id", "left")
 
 # Identify Outliers
-forecast_sales_sdf = forecast_sales_sdf.withColumn(
-    "is_outlier",
-    F.expr("CASE WHEN BILLING_QTY < lower_bound OR BILLING_QTY > upper_bound THEN 1 ELSE 0 END")
+forecast_sales_sdf = (
+    forecast_sales_sdf
+    .with_column(
+        "is_outlier",
+        when(col("BILLING_QTY") < col("lower_bound"), lit(1))
+        .when(col("BILLING_QTY") > col("upper_bound"), lit(1))
+        .otherwise(lit(0))
+    )
 )
 
 # Show Results
