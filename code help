@@ -1,39 +1,44 @@
-from pyspark.sql import SparkSession, functions as F, Window
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, countDistinct, sum as spark_sum, row_number
+from pyspark.sql.window import Window
 
-# Create Spark session
-spark = SparkSession.builder.appName("OutlierDetection").getOrCreate()
+# Initialize Spark Session
+spark = SparkSession.builder.appName("BillingDataProcessing").getOrCreate()
 
-# Sample DataFrame (Replace with actual data)
-df = spark.createDataFrame([
-    (1, 10), (1, 15), (1, 12), (1, 11), (1, 14), (1, 300), (1, 9),
-    (2, 200), (2, 210), (2, 215), (2, 220), (2, 225), (2, 500)
-], ["cat_group_id", "BILLING_QTY"])
+# Sample Data
+data = [
+    ("A1", 2024, 1, 100), ("A1", 2024, 2, 200), ("A1", 2024, 3, 150), 
+    ("A1", 2024, 4, 100), ("A1", 2024, 5, 120), ("A1", 2024, 6, 130),
+    ("A1", 2024, 7, 140), ("A1", 2024, 8, 150), ("A1", 2024, 9, 160),
+    ("A1", 2023, 1, 110), ("A1", 2023, 2, 210), ("A1", 2023, 3, 160),
+    ("B1", 2024, 1, 200), ("B1", 2024, 2, 300), ("B1", 2024, 3, 250),
+    ("B1", 2024, 4, 200), ("B1", 2024, 5, 220), ("B1", 2024, 6, 230),
+    ("B1", 2024, 7, 240), ("B1", 2024, 8, 250), ("B1", 2024, 9, 260),
+    ("B1", 2023, 1, 210), ("B1", 2023, 2, 310), ("B1", 2023, 3, 260),
+]
 
-# Step 1: Assign Row Number
-window_spec = Window.partitionBy("cat_group_id").orderBy("BILLING_QTY")
-df_ranked = df.withColumn("seq", F.row_number().over(window_spec))
+# Create DataFrame
+columns = ["material_id", "billing_year", "billing_month", "billing_quantity"]
+df = spark.createDataFrame(data, columns)
 
-# Step 2: Get Max Sequence Number & Compute Q1, Q3 Index
-df_max_seq = df_ranked.groupBy("cat_group_id").agg(F.max("seq").alias("max_seq"))
-df_quantile_indices = df_max_seq.withColumn("q1_seq", (0.25 * F.col("max_seq")).cast("int")) \
-                                .withColumn("q3_seq", (0.75 * F.col("max_seq")).cast("int"))
+# Step 1: Aggregate Data
+year_summary = (
+    df.groupBy("material_id", "billing_year")
+    .agg(
+        countDistinct("billing_month").alias("months_count"),
+        spark_sum("billing_quantity").alias("total_billing_qty")
+    )
+)
 
-# Step 3: Extract Q1 & Q3 Values
-df_quantiles = df_ranked.join(df_quantile_indices, "cat_group_id", "inner") \
-    .withColumn("Q1", F.when(F.col("seq") == F.col("q1_seq"), F.col("BILLING_QTY"))) \
-    .withColumn("Q3", F.when(F.col("seq") == F.col("q3_seq"), F.col("BILLING_QTY"))) \
-    .groupBy("cat_group_id").agg(F.max("Q1").alias("Q1"), F.max("Q3").alias("Q3"))
+# Step 2: Filter for at least 9 months of data
+filtered_years = year_summary.filter(col("months_count") >= 9)
 
-# Step 4: Compute IQR & Outlier Boundaries
-df_outlier_bounds = df_quantiles.withColumn("IQR", F.col("Q3") - F.col("Q1")) \
-    .withColumn("lower_bound", F.col("Q1") - 1.5 * F.col("IQR")) \
-    .withColumn("upper_bound", F.col("Q3") + 1.5 * F.col("IQR"))
+# Step 3: Rank years for each material_id (latest year first)
+window_spec = Window.partitionBy("material_id").orderBy(col("billing_year").desc())
+ranked_years = filtered_years.withColumn("year_rank", row_number().over(window_spec))
 
-# Step 5: Identify Outliers
-df_final = df.join(df_outlier_bounds, "cat_group_id", "inner") \
-    .withColumn("is_outlier", 
-                F.when((F.col("BILLING_QTY") < F.col("lower_bound")) | 
-                       (F.col("BILLING_QTY") > F.col("upper_bound")), 1).otherwise(0))
+# Step 4: Select the best year per material_id
+final_data = ranked_years.filter(col("year_rank") == 1).select("material_id", "billing_year", "total_billing_qty")
 
-# Show results
-df_final.show()
+# Show result
+final_data.show()
