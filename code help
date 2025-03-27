@@ -1,44 +1,32 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, countDistinct, sum as spark_sum, row_number
+from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
-# Initialize Spark Session
-spark = SparkSession.builder.appName("BillingDataProcessing").getOrCreate()
+# Create Spark session
+spark = SparkSession.builder.appName("FillMissingMonths").getOrCreate()
 
-# Sample Data
+# Sample Data (Replace with actual DataFrame)
 data = [
-    ("A1", 2024, 1, 100), ("A1", 2024, 2, 200), ("A1", 2024, 3, 150), 
-    ("A1", 2024, 4, 100), ("A1", 2024, 5, 120), ("A1", 2024, 6, 130),
-    ("A1", 2024, 7, 140), ("A1", 2024, 8, 150), ("A1", 2024, 9, 160),
-    ("A1", 2023, 1, 110), ("A1", 2023, 2, 210), ("A1", 2023, 3, 160),
-    ("B1", 2024, 1, 200), ("B1", 2024, 2, 300), ("B1", 2024, 3, 250),
-    ("B1", 2024, 4, 200), ("B1", 2024, 5, 220), ("B1", 2024, 6, 230),
-    ("B1", 2024, 7, 240), ("B1", 2024, 8, 250), ("B1", 2024, 9, 260),
-    ("B1", 2023, 1, 210), ("B1", 2023, 2, 310), ("B1", 2023, 3, 260),
+    (1, "A", 1, 100), (1, "A", 2, 150), (1, "A", 4, 130), # Missing months for material A
+    (1, "B", 1, 200), (1, "B", 2, 250), (1, "B", 3, 230), (1, "B", 4, 240) # Full months for B
 ]
+columns = ["cat_group_id", "material_id", "billing_month", "billing_qty"]
 
-# Create DataFrame
-columns = ["material_id", "billing_year", "billing_month", "billing_quantity"]
 df = spark.createDataFrame(data, columns)
 
-# Step 1: Aggregate Data
-year_summary = (
-    df.groupBy("material_id", "billing_year")
-    .agg(
-        countDistinct("billing_month").alias("months_count"),
-        spark_sum("billing_quantity").alias("total_billing_qty")
-    )
+# Step 1: Generate all months (1-12) for each material_id
+months_df = spark.createDataFrame([(i,) for i in range(1, 13)], ["billing_month"])
+material_months = df.select("cat_group_id", "material_id").distinct().crossJoin(months_df)
+
+# Step 2: Outer join to ensure all months exist
+df_filled = material_months.join(df, ["cat_group_id", "material_id", "billing_month"], "left")
+
+# Step 3: Compute mean billing_qty for each material_id
+window_spec = Window.partitionBy("material_id")
+df_filled = df_filled.withColumn(
+    "billing_qty",
+    F.when(F.col("billing_qty").isNull(), F.avg("billing_qty").over(window_spec)).otherwise(F.col("billing_qty"))
 )
 
-# Step 2: Filter for at least 9 months of data
-filtered_years = year_summary.filter(col("months_count") >= 9)
-
-# Step 3: Rank years for each material_id (latest year first)
-window_spec = Window.partitionBy("material_id").orderBy(col("billing_year").desc())
-ranked_years = filtered_years.withColumn("year_rank", row_number().over(window_spec))
-
-# Step 4: Select the best year per material_id
-final_data = ranked_years.filter(col("year_rank") == 1).select("material_id", "billing_year", "total_billing_qty")
-
-# Show result
-final_data.show()
+# Show the final DataFrame
+df_filled.orderBy("material_id", "billing_month").show()
