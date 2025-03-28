@@ -128,3 +128,13 @@ What This Fix Does
 
 Try this and let me know if you still see any issues!
 
+
+import warnings
+
+# Suppress all warnings
+warnings.filterwarnings("ignore")
+
+# Suppress only specific warnings (e.g., FutureWarnings)
+warnings.simplefilter(action="ignore", category=FutureWarning)
+warnings.simplefilter(action="ignore", category=UserWarning)
+
