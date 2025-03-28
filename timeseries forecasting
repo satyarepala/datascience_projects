@@ -72,3 +72,59 @@ pyspark_forecast_df = spark.createDataFrame(forecast_df, schema=schema)
 
 # Show final PySpark DataFrame
 pyspark_forecast_df.show()
+
+
+The warning messages indicate that Statsmodels ARIMA/SARIMA models are expecting a time-based index but are receiving an unsupported index. The models expect datetime-based indices (e.g., pd.DatetimeIndex).
+
+Solution
+
+You need to convert BILLING_MONTH to a proper datetime format before fitting the models.
+
+Fix
+
+Modify the forecast_material function to explicitly set a datetime index:
+
+def forecast_material(df, material_id):
+    results = []
+    material_df = df[df["MATERIAL_ID"] == material_id].sort_values("BILLING_MONTH").copy()
+
+    # Convert BILLING_MONTH to datetime format
+    material_df["BILLING_MONTH"] = pd.to_datetime("2024-01-01") + pd.to_timedelta(material_df["BILLING_MONTH"] - 1, unit="M")
+    material_df.set_index("BILLING_MONTH", inplace=True)
+
+    # Moving Average Model (Simple Exponential Smoothing)
+    model_mvg = SimpleExpSmoothing(material_df["BILLING_QTY"]).fit()
+    forecast_mvg = model_mvg.forecast(12)
+
+    # ARIMA Model
+    model_arima = ARIMA(material_df["BILLING_QTY"], order=(2,1,2), freq="M").fit()
+    forecast_arima = model_arima.forecast(12)
+
+    # SARIMA Model
+    model_sarima = SARIMAX(material_df["BILLING_QTY"], order=(2,1,2), seasonal_order=(1,1,1,12), freq="M").fit()
+    forecast_sarima = model_sarima.forecast(12)
+
+    # Prophet Model
+    prophet_df = material_df.reset_index().rename(columns={"BILLING_MONTH": "ds", "BILLING_QTY": "y"})
+    prophet_model = Prophet()
+    prophet_model.fit(prophet_df)
+    future = prophet_model.make_future_dataframe(periods=12, freq="M")
+    forecast_prophet = prophet_model.predict(future).iloc[-12:]["yhat"].values
+
+    # Store results
+    for i, (mvg, arima, sarima, prophet) in enumerate(zip(forecast_mvg, forecast_arima, forecast_sarima, forecast_prophet), start=1):
+        results.append((material_id, "MOVING_AVG", i, mvg))
+        results.append((material_id, "ARIMA", i, arima))
+        results.append((material_id, "SARIMA", i, sarima))
+        results.append((material_id, "PROPHET", i, prophet))
+
+    return results
+
+What This Fix Does
+
+✅ Converts BILLING_MONTH into a proper datetime format starting from 2024-01-01.
+✅ Sets BILLING_MONTH as an index so that ARIMA/SARIMA can recognize it as a valid time series.
+✅ Adds freq="M" in ARIMA and SARIMA to indicate monthly frequency.
+
+Try this and let me know if you still see any issues!
+
