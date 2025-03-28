@@ -1,10 +1,31 @@
+Yes, you are absolutely right! ROC AUC is not a reliable metric when dealing with highly imbalanced datasets. Instead, PRC AUC (Precision-Recall Curve AUC) is a better metric in such cases because it focuses only on the positive class performance.
+
+
+---
+
+Why ROC AUC Fails in Class Imbalance?
+
+ROC AUC considers true negatives (TN), which can be misleading when the negative class dominates.
+
+A classifier that simply predicts "negative" for all samples can still get a high ROC AUC if the dataset is highly imbalanced.
+
+
+✅ PRC AUC focuses on the minority class and does not consider TN, making it a better choice.
+
+
+---
+
+Updated Code: Add PRC AUC, TP, FP, TN, FN on Train & Test
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 import lightgbm as lgb
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.metrics import (
+    classification_report, roc_auc_score, average_precision_score, confusion_matrix
+)
 
-# Load data (Assuming you have a DataFrame `df`)
+# Load data
 df = pd.read_csv("your_data.csv")  # Change this to your dataset
 
 # Define feature and target columns
@@ -16,7 +37,9 @@ X = df[feature_columns]
 y = df[target_column]
 
 # Train-test split (80-20 split)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)
 
 # Compute class imbalance ratio
 num_neg = np.sum(y_train == 0)
@@ -30,7 +53,7 @@ test_data = lgb.Dataset(X_test, label=y_test, reference=train_data)
 # Define LightGBM parameters
 params = {
     "objective": "binary",
-    "metric": "auc",
+    "metric": "auc",  # We will also compute PRC AUC separately
     "boosting_type": "gbdt",
     "learning_rate": 0.05,
     "num_leaves": 31,
@@ -43,13 +66,62 @@ params = {
 # Train the model
 model = lgb.train(params, train_data, valid_sets=[test_data], early_stopping_rounds=10, verbose_eval=100)
 
-# Predictions
-y_pred_prob = model.predict(X_test)
-y_pred = (y_pred_prob > 0.5).astype(int)  # Convert probabilities to binary output
+# Predictions on Train and Test
+y_train_prob = model.predict(X_train)
+y_train_pred = (y_train_prob > 0.5).astype(int)
 
-# Evaluate Model
-print("ROC AUC Score:", roc_auc_score(y_test, y_pred_prob))
-print("Classification Report:\n", classification_report(y_test, y_pred))
+y_test_prob = model.predict(X_test)
+y_test_pred = (y_test_prob > 0.5).astype(int)
 
-# Feature Importance
-lgb.plot_importance(model)
+# Calculate Metrics on Train and Test
+def evaluate_model(y_true, y_pred, y_prob, dataset_name):
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    roc_auc = roc_auc_score(y_true, y_prob)
+    prc_auc = average_precision_score(y_true, y_prob)
+    
+    print(f"\nEvaluation on {dataset_name} Set:")
+    print(f"True Positives (TP): {tp}")
+    print(f"False Positives (FP): {fp}")
+    print(f"True Negatives (TN): {tn}")
+    print(f"False Negatives (FN): {fn}")
+    print(f"ROC AUC: {roc_auc:.4f}")
+    print(f"PRC AUC (Preferred for Imbalanced Data): {prc_auc:.4f}")
+    print(classification_report(y_true, y_pred))
+
+# Evaluate on Train and Test
+evaluate_model(y_train, y_train_pred, y_train_prob, "Train")
+evaluate_model(y_test, y_test_pred, y_test_prob, "Test")
+
+
+---
+
+Key Updates
+
+1. Added PRC AUC (average_precision_score)
+
+More reliable than ROC AUC for class imbalance problems.
+
+We print it separately for both Train and Test sets.
+
+
+
+2. Added Confusion Matrix Values (TP, FP, TN, FN)
+
+Helps understand false positives (FP) and false negatives (FN) in fraud detection or rare event cases.
+
+
+
+3. Evaluates on both Train & Test sets
+
+Avoids overfitting by comparing performance on training and test data.
+
+
+
+
+
+---
+
+Interpreting PRC AUC & Other Metrics
+
+Would you like to tune hyperparameters using Optuna or try different algorithms like XGBoost or CatBoost for comparison?
+
