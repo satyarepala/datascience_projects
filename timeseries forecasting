@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, IntegerType, StringType, DoubleType
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.holtwinters import SimpleExpSmoothing
 from statsmodels.tsa.statespace.sarimax import SARIMAX
@@ -12,7 +13,7 @@ spark = SparkSession.builder.appName("TimeSeriesForecasting").getOrCreate()
 # Sample PySpark DataFrame (Replace with actual data)
 data = [(101, i, np.random.randint(50, 500)) for i in range(1, 13)] + \
        [(102, i, np.random.randint(100, 800)) for i in range(1, 13)]
-schema = ["material_id", "billing_month", "billing_qty"]
+schema = ["MATERIAL_ID", "BILLING_MONTH", "BILLING_QTY"]
 pyspark_df = spark.createDataFrame(data, schema=schema)
 
 # Convert PySpark DataFrame to Pandas
@@ -21,22 +22,22 @@ df = pyspark_df.toPandas()
 # Define forecasting function
 def forecast_material(df, material_id):
     results = []
-    material_df = df[df["material_id"] == material_id].sort_values("billing_month")
+    material_df = df[df["MATERIAL_ID"] == material_id].sort_values("BILLING_MONTH")
 
     # Moving Average Model (Simple Exponential Smoothing)
-    model_mvg = SimpleExpSmoothing(material_df["billing_qty"]).fit()
+    model_mvg = SimpleExpSmoothing(material_df["BILLING_QTY"]).fit()
     forecast_mvg = model_mvg.forecast(12)
 
     # ARIMA Model
-    model_arima = ARIMA(material_df["billing_qty"], order=(2,1,2)).fit()
+    model_arima = ARIMA(material_df["BILLING_QTY"], order=(2,1,2)).fit()
     forecast_arima = model_arima.forecast(12)
 
-    # SARIMA Model (p,d,q)(P,D,Q,s) where s=12 for monthly seasonality
-    model_sarima = SARIMAX(material_df["billing_qty"], order=(2,1,2), seasonal_order=(1,1,1,12)).fit()
+    # SARIMA Model
+    model_sarima = SARIMAX(material_df["BILLING_QTY"], order=(2,1,2), seasonal_order=(1,1,1,12)).fit()
     forecast_sarima = model_sarima.forecast(12)
 
     # Prophet Model
-    prophet_df = material_df.rename(columns={"billing_month": "ds", "billing_qty": "y"})
+    prophet_df = material_df.rename(columns={"BILLING_MONTH": "ds", "BILLING_QTY": "y"})
     prophet_df["ds"] = pd.to_datetime("2024") + pd.to_timedelta(prophet_df["ds"] - 1, unit="M")
     prophet_model = Prophet()
     prophet_model.fit(prophet_df)
@@ -45,20 +46,29 @@ def forecast_material(df, material_id):
 
     # Store results
     for i, (mvg, arima, sarima, prophet) in enumerate(zip(forecast_mvg, forecast_arima, forecast_sarima, forecast_prophet), start=13):
-        results.append((material_id, "Moving_Avg", i, mvg))
+        results.append((material_id, "MOVING_AVG", i, mvg))
         results.append((material_id, "ARIMA", i, arima))
         results.append((material_id, "SARIMA", i, sarima))
-        results.append((material_id, "Prophet", i, prophet))
+        results.append((material_id, "PROPHET", i, prophet))
 
     return results
 
-# Apply forecasting to each material_id
+# Apply forecasting to each MATERIAL_ID
 forecast_results = []
-for material_id in df["material_id"].unique():
+for material_id in df["MATERIAL_ID"].unique():
     forecast_results.extend(forecast_material(df, material_id))
 
-# Create final Pandas DataFrame
-forecast_df = pd.DataFrame(forecast_results, columns=["material_id", "model_name", "billing_month", "billing_qty"])
+# Create Pandas DataFrame
+forecast_df = pd.DataFrame(forecast_results, columns=["MATERIAL_ID", "MODEL_NAME", "BILLING_MONTH", "BILLING_QTY"])
 
-# Display forecast
-print(forecast_df)
+# Convert Pandas DataFrame to PySpark DataFrame
+schema = StructType([
+    StructField("MATERIAL_ID", IntegerType(), True),
+    StructField("MODEL_NAME", StringType(), True),
+    StructField("BILLING_MONTH", IntegerType(), True),
+    StructField("BILLING_QTY", DoubleType(), True)
+])
+pyspark_forecast_df = spark.createDataFrame(forecast_df, schema=schema)
+
+# Show final PySpark DataFrame
+pyspark_forecast_df.show()
