@@ -1,0 +1,64 @@
+import pandas as pd
+import numpy as np
+from pyspark.sql import SparkSession
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.holtwinters import SimpleExpSmoothing
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from prophet import Prophet
+
+# Initialize Spark
+spark = SparkSession.builder.appName("TimeSeriesForecasting").getOrCreate()
+
+# Sample PySpark DataFrame (Replace with actual data)
+data = [(101, i, np.random.randint(50, 500)) for i in range(1, 13)] + \
+       [(102, i, np.random.randint(100, 800)) for i in range(1, 13)]
+schema = ["material_id", "billing_month", "billing_qty"]
+pyspark_df = spark.createDataFrame(data, schema=schema)
+
+# Convert PySpark DataFrame to Pandas
+df = pyspark_df.toPandas()
+
+# Define forecasting function
+def forecast_material(df, material_id):
+    results = []
+    material_df = df[df["material_id"] == material_id].sort_values("billing_month")
+
+    # Moving Average Model (Simple Exponential Smoothing)
+    model_mvg = SimpleExpSmoothing(material_df["billing_qty"]).fit()
+    forecast_mvg = model_mvg.forecast(12)
+
+    # ARIMA Model
+    model_arima = ARIMA(material_df["billing_qty"], order=(2,1,2)).fit()
+    forecast_arima = model_arima.forecast(12)
+
+    # SARIMA Model (p,d,q)(P,D,Q,s) where s=12 for monthly seasonality
+    model_sarima = SARIMAX(material_df["billing_qty"], order=(2,1,2), seasonal_order=(1,1,1,12)).fit()
+    forecast_sarima = model_sarima.forecast(12)
+
+    # Prophet Model
+    prophet_df = material_df.rename(columns={"billing_month": "ds", "billing_qty": "y"})
+    prophet_df["ds"] = pd.to_datetime("2024") + pd.to_timedelta(prophet_df["ds"] - 1, unit="M")
+    prophet_model = Prophet()
+    prophet_model.fit(prophet_df)
+    future = prophet_model.make_future_dataframe(periods=12, freq="M")
+    forecast_prophet = prophet_model.predict(future).iloc[-12:]["yhat"].values
+
+    # Store results
+    for i, (mvg, arima, sarima, prophet) in enumerate(zip(forecast_mvg, forecast_arima, forecast_sarima, forecast_prophet), start=13):
+        results.append((material_id, "Moving_Avg", i, mvg))
+        results.append((material_id, "ARIMA", i, arima))
+        results.append((material_id, "SARIMA", i, sarima))
+        results.append((material_id, "Prophet", i, prophet))
+
+    return results
+
+# Apply forecasting to each material_id
+forecast_results = []
+for material_id in df["material_id"].unique():
+    forecast_results.extend(forecast_material(df, material_id))
+
+# Create final Pandas DataFrame
+forecast_df = pd.DataFrame(forecast_results, columns=["material_id", "model_name", "billing_month", "billing_qty"])
+
+# Display forecast
+print(forecast_df)
