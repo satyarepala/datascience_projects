@@ -1,32 +1,55 @@
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+import lightgbm as lgb
+from sklearn.metrics import classification_report, roc_auc_score
 
-# Create Spark session
-spark = SparkSession.builder.appName("FillMissingMonths").getOrCreate()
+# Load data (Assuming you have a DataFrame `df`)
+df = pd.read_csv("your_data.csv")  # Change this to your dataset
 
-# Sample Data (Replace with actual DataFrame)
-data = [
-    (1, "A", 1, 100), (1, "A", 2, 150), (1, "A", 4, 130), # Missing months for material A
-    (1, "B", 1, 200), (1, "B", 2, 250), (1, "B", 3, 230), (1, "B", 4, 240) # Full months for B
-]
-columns = ["cat_group_id", "material_id", "billing_month", "billing_qty"]
+# Define feature and target columns
+feature_columns = ["col1", "col2", "col3", ...]  # Replace with actual feature names
+target_column = "target"  # Replace with actual target column name
 
-df = spark.createDataFrame(data, columns)
+# Split data into features (X) and target (y)
+X = df[feature_columns]
+y = df[target_column]
 
-# Step 1: Generate all months (1-12) for each material_id
-months_df = spark.createDataFrame([(i,) for i in range(1, 13)], ["billing_month"])
-material_months = df.select("cat_group_id", "material_id").distinct().crossJoin(months_df)
+# Train-test split (80-20 split)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
 
-# Step 2: Outer join to ensure all months exist
-df_filled = material_months.join(df, ["cat_group_id", "material_id", "billing_month"], "left")
+# Compute class imbalance ratio
+num_neg = np.sum(y_train == 0)
+num_pos = np.sum(y_train == 1)
+scale_pos_weight = num_neg / num_pos  # Helps LightGBM handle class imbalance
 
-# Step 3: Compute mean billing_qty for each material_id
-window_spec = Window.partitionBy("material_id")
-df_filled = df_filled.withColumn(
-    "billing_qty",
-    F.when(F.col("billing_qty").isNull(), F.avg("billing_qty").over(window_spec)).otherwise(F.col("billing_qty"))
-)
+# Create LightGBM dataset
+train_data = lgb.Dataset(X_train, label=y_train)
+test_data = lgb.Dataset(X_test, label=y_test, reference=train_data)
 
-# Show the final DataFrame
-df_filled.orderBy("material_id", "billing_month").show()
+# Define LightGBM parameters
+params = {
+    "objective": "binary",
+    "metric": "auc",
+    "boosting_type": "gbdt",
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "max_depth": -1,
+    "scale_pos_weight": scale_pos_weight,  # Handling class imbalance
+    "verbose": -1,
+    "random_state": 42,
+}
+
+# Train the model
+model = lgb.train(params, train_data, valid_sets=[test_data], early_stopping_rounds=10, verbose_eval=100)
+
+# Predictions
+y_pred_prob = model.predict(X_test)
+y_pred = (y_pred_prob > 0.5).astype(int)  # Convert probabilities to binary output
+
+# Evaluate Model
+print("ROC AUC Score:", roc_auc_score(y_test, y_pred_prob))
+print("Classification Report:\n", classification_report(y_test, y_pred))
+
+# Feature Importance
+lgb.plot_importance(model)
