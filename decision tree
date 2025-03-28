@@ -1,0 +1,36 @@
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import classification_report, roc_auc_score, average_precision_score, confusion_matrix
+
+# Train Decision Tree model
+dt_model = DecisionTreeClassifier(
+    max_depth=10,  # Limit depth to prevent overfitting
+    class_weight="balanced",  # Handle class imbalance automatically
+    random_state=42
+)
+dt_model.fit(X_train, y_train)
+
+# Predictions on Train and Test
+y_train_pred = dt_model.predict(X_train)
+y_test_pred = dt_model.predict(X_test)
+
+y_train_prob = dt_model.predict_proba(X_train)[:, 1]  # Probability for class 1
+y_test_prob = dt_model.predict_proba(X_test)[:, 1]
+
+# Evaluation function
+def evaluate_model(y_true, y_pred, y_prob, dataset_name):
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    roc_auc = roc_auc_score(y_true, y_prob)
+    prc_auc = average_precision_score(y_true, y_prob)
+    
+    print(f"\nEvaluation on {dataset_name} Set:")
+    print(f"True Positives (TP): {tp}")
+    print(f"False Positives (FP): {fp}")
+    print(f"True Negatives (TN): {tn}")
+    print(f"False Negatives (FN): {fn}")
+    print(f"ROC AUC: {roc_auc:.4f}")
+    print(f"PRC AUC (Preferred for Imbalanced Data): {prc_auc:.4f}")
+    print(classification_report(y_true, y_pred))
+
+# Evaluate on Train and Test
+evaluate_model(y_train, y_train_pred, y_train_prob, "Train")
+evaluate_model(y_test, y_test_pred, y_test_prob, "Test")
