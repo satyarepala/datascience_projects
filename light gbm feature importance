@@ -1,0 +1,16 @@
+import matplotlib.pyplot as plt
+import lightgbm as lgb
+
+lgb.plot_importance(model, importance_type="gain", max_num_features=20)
+plt.show()
+
+
+importance = model.feature_importance(importance_type="gain")
+feature_names = X_train.columns
+feature_importance_df = pd.DataFrame({"Feature": feature_names, "Importance": importance})
+feature_importance_df = feature_importance_df.sort_values(by="Importance", ascending=False)
+
+print(feature_importance_df.head(20))  # Show top 20 important features
+
+lgb.plot_importance(model, importance_type="split", max_num_features=20)
+plt.show()
