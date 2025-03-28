@@ -1,0 +1,124 @@
+Yes! Below, I provide a block-wise structure where you only need to modify the relevant parts to switch from LightGBM to CatBoost while keeping everything else the same.
+
+
+---
+
+Changes Needed for CatBoost
+
+1. Import CatBoost
+
+from catboost import CatBoostClassifier, Pool
+
+
+2. Modify Model Training & Prediction
+
+Replace LightGBM’s dataset creation with CatBoost’s Pool.
+
+Use CatBoostClassifier instead of lgb.train.
+
+
+
+3. Modify Hyperparameters for CatBoost
+
+CatBoost does not require manually setting scale_pos_weight because it automatically handles class imbalance.
+
+Use loss_function='Logloss' or 'CrossEntropy' instead of LightGBM’s objective='binary'.
+
+
+
+
+
+---
+
+Updated Code with Modifiable Blocks
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from catboost import CatBoostClassifier, Pool  # Change 1: Import CatBoost
+from sklearn.metrics import (
+    classification_report, roc_auc_score, average_precision_score, confusion_matrix
+)
+
+# Load data
+df = pd.read_csv("your_data.csv")  # Change this to your dataset
+
+# Define feature and target columns
+feature_columns = ["col1", "col2", "col3", ...]  # Replace with actual feature names
+target_column = "target"  # Replace with actual target column name
+
+# Split data into features (X) and target (y)
+X = df[feature_columns]
+y = df[target_column]
+
+# Train-test split (80-20 split)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)
+
+# Change 2: Replace LightGBM dataset creation with CatBoost Pool
+train_data = Pool(X_train, label=y_train)
+test_data = Pool(X_test, label=y_test)
+
+# Change 3: Modify CatBoost parameters
+catboost_params = {
+    "iterations": 1000,  # Number of trees
+    "depth": 6,  # Tree depth
+    "learning_rate": 0.05,  # Step size
+    "loss_function": "Logloss",  # CatBoost loss function
+    "eval_metric": "AUC",  # Similar to LightGBM metric
+    "random_seed": 42,
+    "verbose": 100,
+    "early_stopping_rounds": 10,
+    "auto_class_weights": "Balanced",  # Handles class imbalance automatically
+}
+
+# Change 4: Train CatBoost model instead of LightGBM
+model = CatBoostClassifier(**catboost_params)
+model.fit(train_data, eval_set=test_data, early_stopping_rounds=10, verbose=100)
+
+# Predictions on Train and Test
+y_train_prob = model.predict_proba(X_train)[:, 1]  # Probabilities for class 1
+y_train_pred = (y_train_prob > 0.5).astype(int)
+
+y_test_prob = model.predict_proba(X_test)[:, 1]
+y_test_pred = (y_test_prob > 0.5).astype(int)
+
+# Evaluation function (unchanged)
+def evaluate_model(y_true, y_pred, y_prob, dataset_name):
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    roc_auc = roc_auc_score(y_true, y_prob)
+    prc_auc = average_precision_score(y_true, y_prob)
+    
+    print(f"\nEvaluation on {dataset_name} Set:")
+    print(f"True Positives (TP): {tp}")
+    print(f"False Positives (FP): {fp}")
+    print(f"True Negatives (TN): {tn}")
+    print(f"False Negatives (FN): {fn}")
+    print(f"ROC AUC: {roc_auc:.4f}")
+    print(f"PRC AUC (Preferred for Imbalanced Data): {prc_auc:.4f}")
+    print(classification_report(y_true, y_pred))
+
+# Evaluate on Train and Test
+evaluate_model(y_train, y_train_pred, y_train_prob, "Train")
+evaluate_model(y_test, y_test_pred, y_test_prob, "Test")
+
+
+---
+
+What Changed for CatBoost?
+
+
+---
+
+Why CatBoost Might Work Better?
+
+Handles categorical features automatically (if provided).
+
+Auto-class balancing (auto_class_weights="Balanced") works better for imbalanced datasets.
+
+Faster training on CPU compared to LightGBM.
+
+
+Would you like me to include a block for XGBoost as well?
+
