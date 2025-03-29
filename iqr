@@ -1,0 +1,23 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, collect_list, expr
+
+# Initialize Spark session
+spark = SparkSession.builder.appName("GroupByIQR").getOrCreate()
+
+# Sample Data
+data = [
+    ("A", 10), ("A", 20), ("A", 30), ("A", 40), ("A", 50),
+    ("B", 5), ("B", 15), ("B", 25), ("B", 35), ("B", 45)
+]
+columns = ["Category", "Value"]
+
+df = spark.createDataFrame(data, columns)
+
+# Compute IQR using approxQuantile()
+def compute_iqr(values):
+    q1, q3 = values.approxQuantile("Value", [0.25, 0.75], 0.01)
+    return q3 - q1
+
+# Group by category and compute IQR
+iqr_values = df.groupBy("Category").agg(expr("percentile_approx(Value, 0.75) - percentile_approx(Value, 0.25) AS IQR"))
+iqr_values.show()
