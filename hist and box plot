@@ -1,0 +1,27 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+# Convert PySpark DataFrame column to Pandas
+pdf = spark_df.select("monthly_abs_error_perc").toPandas()
+
+# Set plot style
+sns.set_style("whitegrid")
+
+# Create a figure with two subplots
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+# Histogram
+sns.histplot(pdf["monthly_abs_error_perc"], bins=30, kde=True, ax=axes[0])
+axes[0].set_title("Histogram of Monthly Absolute Error Percentage")
+axes[0].set_xlabel("Error Percentage")
+axes[0].set_ylabel("Frequency")
+
+# Box Plot
+sns.boxplot(x=pdf["monthly_abs_error_perc"], ax=axes[1])
+axes[1].set_title("Box Plot of Monthly Absolute Error Percentage")
+axes[1].set_xlabel("Error Percentage")
+
+# Show plots
+plt.tight_layout()
+plt.show()
