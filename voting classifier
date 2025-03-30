@@ -1,0 +1,20 @@
+from sklearn.ensemble import VotingClassifier, RandomForestClassifier from catboost import CatBoostClassifier from xgboost import XGBClassifier from lightgbm import LGBMClassifier from sklearn.metrics import accuracy_score
+
+Define base classifiers
+
+rf = RandomForestClassifier(n_estimators=50, max_depth=4, random_state=42) cat = CatBoostClassifier(iterations=100, depth=4, learning_rate=0.1, random_seed=42, verbose=0) xgb = XGBClassifier(n_estimators=100, max_depth=4, learning_rate=0.1, random_state=42, use_label_encoder=False, eval_metric='logloss') lgb = LGBMClassifier(n_estimators=100, max_depth=4, learning_rate=0.1, random_state=42)
+
+Create Voting Classifier (Soft Voting)
+
+voting_clf = VotingClassifier( estimators=[('rf', rf), ('cat', cat), ('xgb', xgb), ('lgb', lgb)], voting='soft'  # Use 'hard' for majority voting )
+
+Train the ensemble
+
+voting_clf.fit(X_train, y_train)
+
+Predict on test set
+
+y_pred = voting_clf.predict(X_test) accuracy = accuracy_score(y_test, y_pred)
+
+print(f'Voting Classifier Accuracy: {accuracy:.4f}')
+
