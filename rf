@@ -1,0 +1,14 @@
+from sklearn.ensemble import RandomForestClassifier from sklearn.metrics import log_loss
+
+Train a Random Forest model
+
+rf_model = RandomForestClassifier( n_estimators=100,  # Number of trees max_depth=12,  # Maximum depth of trees random_state=42,  # For reproducibility class_weight='balanced'  # Handling class imbalance )
+
+Fit the model
+
+rf_model.fit(X_train, y_train)
+
+Evaluate on test data
+
+y_pred_proba = rf_model.predict_proba(X_test)[:, 1]  # Probability of class 1 loss = log_loss(y_test, y_pred_proba) print(f'Binary Log Loss on test data: {loss:.6f}')
+
