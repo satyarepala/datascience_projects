@@ -1,0 +1,43 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+# Sample Data
+np.random.seed(42)
+X = np.random.rand(20, 3)  # 20 samples, 3 features
+y = np.array([0]*12 + [1]*8)  # 12 samples of class 0, 8 samples of class 1
+
+# Convert to DataFrame for easy handling
+df = pd.DataFrame(X, columns=["f1", "f2", "f3"])
+df["y"] = y  # Add target column
+
+# Define train ratios
+train_ratio_0 = 0.9  # 90% train, 10% test for Class 0
+train_ratio_1 = 0.6  # 60% train, 40% test for Class 1
+
+# Split each class separately
+df_class_0 = df[df["y"] == 0]
+df_class_1 = df[df["y"] == 1]
+
+X_train_0, X_test_0, y_train_0, y_test_0 = train_test_split(
+    df_class_0.drop(columns=["y"]), df_class_0["y"], train_size=train_ratio_0, random_state=42
+)
+X_train_1, X_test_1, y_train_1, y_test_1 = train_test_split(
+    df_class_1.drop(columns=["y"]), df_class_1["y"], train_size=train_ratio_1, random_state=42
+)
+
+# Combine train and test sets
+X_train = pd.concat([X_train_0, X_train_1]).sample(frac=1, random_state=42)  # Shuffle
+y_train = pd.concat([y_train_0, y_train_1]).sample(frac=1, random_state=42)
+
+X_test = pd.concat([X_test_0, X_test_1]).sample(frac=1, random_state=42)  # Shuffle
+y_test = pd.concat([y_test_0, y_test_1]).sample(frac=1, random_state=42)
+
+# Convert back to NumPy arrays if needed
+X_train, y_train = X_train.to_numpy(), y_train.to_numpy()
+X_test, y_test = X_test.to_numpy(), y_test.to_numpy()
+
+# Print dataset sizes
+print(f"Train size: {X_train.shape[0]}, Test size: {X_test.shape[0]}")
+print(f"Class 0 - Train: {sum(y_train == 0)}, Test: {sum(y_test == 0)}")
+print(f"Class 1 - Train: {sum(y_train == 1)}, Test: {sum(y_test == 1)}")
