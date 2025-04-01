@@ -1,0 +1,51 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from prophet import Prophet
+
+# Load your dataframes: sales_2024_sdf and sales_2025_sdf
+# Assuming they are already defined
+
+# Select a material_id for modeling
+material_id_selected = 101  # Change this as needed
+
+# Filter data for the selected material_id
+sales_2024_filtered = sales_2024_sdf[sales_2024_sdf['material_id'] == material_id_selected]
+sales_2025_filtered = sales_2025_sdf[sales_2025_sdf['material_id'] == material_id_selected]
+
+# Prepare data for Prophet
+df_prophet = sales_2024_filtered[['billing_date_norm', 'billing_quantity']].rename(
+    columns={'billing_date_norm': 'ds', 'billing_quantity': 'y'}
+)
+
+# Define Prophet model with hyperparameters
+prophet_model = Prophet(
+    seasonality_mode='multiplicative',  # Can be 'additive' or 'multiplicative'
+    changepoint_prior_scale=0.05,  # Controls trend flexibility
+    seasonality_prior_scale=10.0  # Controls seasonality flexibility
+)
+
+# Fit the model
+prophet_model.fit(df_prophet)
+
+# Create future dataframe for the next 3 months (Jan-Mar 2025)
+future_dates = prophet_model.make_future_dataframe(periods=3, freq='MS')
+
+# Forecast
+forecast = prophet_model.predict(future_dates)
+
+# Extract forecasted values for Jan-Mar 2025
+forecast_2025 = forecast[['ds', 'yhat']].tail(3)
+
+# Plot actual vs. forecasted values
+plt.figure(figsize=(10, 5))
+plt.plot(df_prophet['ds'], df_prophet['y'], label='2024 Actual Billing Qty', marker='o')
+plt.plot(sales_2025_filtered['billing_date_norm'], sales_2025_filtered['billing_quantity'], label='2025 Actual Billing Qty', marker='s')
+plt.plot(forecast_2025['ds'], forecast_2025['yhat'], label='2025 Forecasted Billing Qty', linestyle='dashed', marker='x')
+
+plt.xlabel('Date')
+plt.ylabel('Billing Quantity')
+plt.title(f'Billing Quantity Forecast for Material ID {material_id_selected}')
+plt.legend()
+plt.grid()
+plt.xticks(rotation=45)
+plt.show()
