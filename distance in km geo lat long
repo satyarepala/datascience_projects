@@ -25,3 +25,30 @@ df = df.withColumn("distance_km", haversine_udf(df.geolatitude, df.geolongitude,
 
 # Show Results
 df.select("geolatitude", "geolongitude", "prev_geolatitude", "prev_geolongitude", "distance_km").show()
+
+
+
+
+
+import math
+import pyspark.sql.functions as F
+
+# Earth's radius in km
+R = 6371.0  
+
+df = df.withColumn("dlat", F.radians(F.col("prev_geolatitude") - F.col("geolatitude")))
+df = df.withColumn("dlon", F.radians(F.col("prev_geolongitude") - F.col("geolongitude")))
+df = df.withColumn("lat1_rad", F.radians(F.col("geolatitude")))
+df = df.withColumn("lat2_rad", F.radians(F.col("prev_geolatitude")))
+
+df = df.withColumn("a", F.pow(F.sin(F.col("dlat") / 2), 2) + 
+                       F.cos(F.col("lat1_rad")) * F.cos(F.col("lat2_rad")) * 
+                       F.pow(F.sin(F.col("dlon") / 2), 2))
+
+df = df.withColumn("c", 2 * F.atan2(F.sqrt(F.col("a")), F.sqrt(1 - F.col("a"))))
+df = df.withColumn("distance_km", F.col("c") * F.lit(R))
+
+# Drop intermediate columns
+df = df.drop("dlat", "dlon", "lat1_rad", "lat2_rad", "a", "c")
+
+df.select("geolatitude", "geolongitude", "prev_geolatitude", "prev_geolongitude", "distance_km").show()
