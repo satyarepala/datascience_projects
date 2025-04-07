@@ -38,3 +38,25 @@ dot_data = export_graphviz(
 graph = graphviz.Source(dot_data)
 graph.render("tree")  # Saves as a PDF
 graph.view()          # Opens the PDF
+
+
+
+
+from sklearn.datasets import load_iris
+from sklearn.ensemble import RandomForestClassifier
+
+# Load dataset
+X, y = load_iris(return_X_y=True)
+model = RandomForestClassifier(n_estimators=1, random_state=42)
+model.fit(X, y)
+
+# Access the first tree
+tree = model.estimators_[0].tree_
+
+# Print structure
+for i in range(tree.node_count):
+    if tree.children_left[i] != tree.children_right[i]:  # Not a leaf
+        print(f"Node {i}: If feature[{tree.feature[i]}] <= {tree.threshold[i]:.2f} "
+              f"go to node {tree.children_left[i]}, else to node {tree.children_right[i]}")
+    else:
+        print(f"Leaf node {i}: predict class {tree.value[i]}")
