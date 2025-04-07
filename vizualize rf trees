@@ -1,0 +1,40 @@
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import load_iris
+from sklearn.tree import plot_tree
+import matplotlib.pyplot as plt
+
+# Load data and train model
+X, y = load_iris(return_X_y=True)
+model = RandomForestClassifier(n_estimators=10, random_state=42)
+model.fit(X, y)
+
+# Plot the first tree
+plt.figure(figsize=(20,10))
+plot_tree(model.estimators_[0], filled=True, feature_names=load_iris().feature_names, class_names=load_iris().target_names)
+plt.show()
+
+
+from sklearn.tree import export_text
+
+tree_text = export_text(model.estimators_[0], feature_names=load_iris().feature_names)
+print(tree_text)
+
+
+
+
+
+
+from sklearn.tree import export_graphviz
+import graphviz
+
+dot_data = export_graphviz(
+    model.estimators_[0],
+    out_file=None,
+    feature_names=load_iris().feature_names,
+    class_names=load_iris().target_names,
+    filled=True, rounded=True
+)
+
+graph = graphviz.Source(dot_data)
+graph.render("tree")  # Saves as a PDF
+graph.view()          # Opens the PDF
