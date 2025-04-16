@@ -1,0 +1,14 @@
+benchmarking assessment was conducted between two vendors – Mitek and AuthenticID – to evaluate their capabilities across multiple dimensions such as liveness detection, deepfake selfie detection, fraud detection, manual review process, geographic coverage, document support, and reported reliability.
+
+AuthenticID offers a faster response time (6 seconds, aiming for 2.5 seconds in 2025) with a fully automated process, while
+
+Mitek provides a manual review team to handle unsupported documents and quality issues.
+
+Both vendors provide liveness and deepfake detection, but AuthenticID uses passive liveness and is PAD2 iBeta certified.
+
+Fraud detection methods vary: Mitek emphasizes velocity checks and injection attack defense; AuthenticID supports SOR checks and fraudshield integration.
+
+Reliability and coverage were also considered, with both supporting a wide range of countries and standard identity documents.
+
+
+This comparison helped in understanding each vendor’s strengths and trade-offs for the final selection decision.
