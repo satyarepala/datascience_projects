@@ -1,1 +1,20 @@
-For model training and validation, the sampled data from EWS was randomly divided into two subsets: 90% for training and 10% for validation. This random sampling ensured the preservation of the original class and temporal distributions within the development data. The model was trained on the 90% training subset and hyperparameters were tuned using the 10% validation subset. The test dataset was not drawn from this sample; instead, it was selected from the remaining scoreable population that was not included in the development sample. This separation ensured an unbiased evaluation of the model’s generalization ability on truly unseen data.
+The XGBoost classifier used in the model relies on a set of hyperparameters that significantly influence its learning behavior and predictive performance. To determine the optimal set of hyperparameters, a Grid Search Cross-Validation (Grid Search CV) approach was employed. The grid search was conducted on the training data using predefined ranges for each hyperparameter. The following XGBoost parameters were considered for tuning:
+
+max_depth: controls the depth of individual trees
+
+learning_rate: controls the contribution of each tree
+
+n_estimators: number of boosting rounds
+
+subsample: fraction of samples used for training each tree
+
+colsample_bytree: fraction of features used per tree
+
+gamma: minimum loss reduction required to make a further partition
+
+min_child_weight: minimum sum of instance weight (hessian) needed in a child
+
+scale_pos_weight: used to balance positive and negative classes in imbalanced datasets
+
+
+Each parameter was associated with a search grid defined using intgrid, floatgrid, or listgrid types depending on the nature of the parameter. The grid search process evaluated all possible combinations within the defined search space using k-fold cross-validation (typically 5-fold), and selected the combination that yielded the best performance based on the configured loss function (e.g., log loss or softprob). Once the best hyperparameter set was identified, the model was retrained on the entire training dataset. The final model was then validated on the hold-out validation and test sets to assess generalization performance.
