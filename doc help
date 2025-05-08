@@ -1,1 +1,13 @@
-The sampling approach involved creating a hold-out set by randomly splitting the development data into 90% training and 10% validation, preserving temporal and feature distributions. An out-of-time (OOT) sample was separately drawn from non-overlapping time periods, including pre- and post-COVID phases, to evaluate model stability over time.
+We need to interpret these metrics slightly differently.
+
+In this context, a score band of 800 implies that all records with a minimum score of 800 are considered positive predictions, and all records below this threshold are considered negative.
+
+The TP (True Positive) column represents the percentage of actual positive instances correctly predicted as positive, while FN (False Negative) denotes the percentage of actual positive instances incorrectly predicted as negative.
+
+Similarly, the TN (True Negative) column indicates the percentage of actual negative instances correctly predicted as negative, and the FP (False Positive) reflects the percentage of actual negative instances incorrectly predicted as positive.
+
+Although this is an unconventional way of presenting classification metrics, it has been adopted here to highlight how performance changes with different score thresholds.
+
+For clarity, consider an example: suppose the test sample contains 100 authentic (positive) and 100 fraudulent (negative) documents.
+At a score band of 900, which represents a high threshold, 53.89% of the positive samples are correctly classified as positive (TP), while 46.11% are misclassified as negative (FN).
+As the score threshold increases, the model tends to miss more positive samples, increasing false negatives.
