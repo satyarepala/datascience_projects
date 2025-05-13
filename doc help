@@ -1,13 +1,32 @@
-We need to interpret these metrics slightly differently.
+Section 18a: Input Data
+Please provide responses to the following regarding the input data used in your AI/ML model:
 
-In this context, a score band of 800 implies that all records with a minimum score of 800 are considered positive predictions, and all records below this threshold are considered negative.
+1. What is the source of the input data used in this model?
 
-The TP (True Positive) column represents the percentage of actual positive instances correctly predicted as positive, while FN (False Negative) denotes the percentage of actual positive instances incorrectly predicted as negative.
 
-Similarly, the TN (True Negative) column indicates the percentage of actual negative instances correctly predicted as negative, and the FP (False Positive) reflects the percentage of actual negative instances incorrectly predicted as positive.
+2. What steps have been taken to ensure the completeness of the input data?
 
-Although this is an unconventional way of presenting classification metrics, it has been adopted here to highlight how performance changes with different score thresholds.
 
-For clarity, consider an example: suppose the test sample contains 100 authentic (positive) and 100 fraudulent (negative) documents.
-At a score band of 900, which represents a high threshold, 53.89% of the positive samples are correctly classified as positive (TP), while 46.11% are misclassified as negative (FN).
-As the score threshold increases, the model tends to miss more positive samples, increasing false negatives.
+3. What steps have been taken to ensure the accuracy and integrity of the input data?
+
+
+4. If the timeliness of the input data is important for the model’s use case, what steps have been taken to ensure timely data?
+
+
+
+
+---
+
+Section 18b: Training Data
+Please provide responses to the following regarding the training data used in your AI/ML model:
+
+1. What is the source of the training data used in this model?
+
+
+2. What steps have been taken to ensure the completeness of the training data?
+
+
+3. What steps have been taken to ensure the accuracy and integrity of the training data?
+
+
+4. If the timeliness of the training data is relevant for the model’s use case, what steps have been taken to ensure timely data?
